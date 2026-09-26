@@ -9,6 +9,30 @@ public static class AutostartHelper
     private const string ValueName = "SpeedyMonitor";
     private const string LegacyValueName = "NetSpeedMonitor";
 
+    /// <summary>
+    /// Registry ist die Quelle der Wahrheit (der Installer setzt den Eintrag ggf. selbst).
+    /// Zeigt ein vorhandener Eintrag auf einen anderen Pfad (exe verschoben/neu installiert),
+    /// wird er auf die aktuelle exe umgebogen. Gibt zurueck, ob Autostart aktiv ist.
+    /// </summary>
+    public static bool Synchronize()
+    {
+        bool hasEntry;
+        try
+        {
+            using var key = Registry.CurrentUser.OpenSubKey(RunKeyPath, writable: false);
+            hasEntry = key?.GetValue(ValueName) is string;
+        }
+        catch (Exception ex)
+        {
+            AppLog.Error("Autostart-Status konnte nicht gelesen werden", ex);
+            return false;
+        }
+
+        if (hasEntry && !IsEnabled())
+            SetEnabled(true);
+        return hasEntry;
+    }
+
     public static bool IsEnabled()
     {
         try

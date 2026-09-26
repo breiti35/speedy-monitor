@@ -76,6 +76,21 @@ Ersatz ohne Systemeingriff (kein Taskleisten-Mod wie ExplorerPatcher nötig).
 Funktioniert zuverlässig, kann aber bei künftigen größeren Windows-Updates
 angepasst werden müssen, falls sich die interne Taskleisten-Struktur ändert.
 
+## Installation
+
+`installer\Output\SpeedyMonitor_Setup_<Version>.exe` ausführen. Installiert pro
+Benutzer ohne Admin-Rechte nach `%LocalAppData%\Programs\Speedy Monitor`, mit
+Startmenü-Eintrag, optional Desktop-Icon und Autostart. Deinstallation über
+„Apps & Features“ (fragt, ob Einstellungen und Statistik gelöscht werden sollen).
+Voraussetzung: .NET 8 Desktop Runtime (x64) – das Setup prüft das und bietet
+sonst den Download an.
+
+Setup neu bauen (benötigt Inno Setup 6.7+):
+
+```
+powershell -ExecutionPolicy Bypass -File build-installer.ps1
+```
+
 ## Entwickeln / neu bauen
 
 ```

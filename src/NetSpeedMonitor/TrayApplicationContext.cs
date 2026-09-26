@@ -67,8 +67,7 @@ public sealed class TrayApplicationContext : ApplicationContext
         _monitor.SampleReady += OnSample;
         _monitor.Start();
 
-        if (_settings.AutostartEnabled != AutostartHelper.IsEnabled())
-            AutostartHelper.SetEnabled(_settings.AutostartEnabled);
+        _settings.AutostartEnabled = AutostartHelper.Synchronize();
 
         // Taskleisten-/Tray-Position ist normalerweise stabil, kann sich aber durch
         // Aufloesungswechsel, Monitorwechsel oder einen Explorer-Neustart aendern.
