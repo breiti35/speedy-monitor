@@ -43,11 +43,18 @@ SolidCompression=yes
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 MinVersion=10.0.17763
+ShowLanguageDialog=auto
 
 [Languages]
+; Englisch zuerst: Inno waehlt die zur Windows-Sprache passende Sprache, sonst die erste.
+Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "german"; MessagesFile: "compiler:Languages\German.isl"
 
 [CustomMessages]
+english.AutostartTask=Start with Windows
+english.OtherTasks=Other options:
+english.RuntimeMissing=Speedy Monitor requires the .NET 8 Desktop Runtime (x64), which was not found on this PC.%n%nOpen the download page now? After installing the runtime, simply run this setup again.
+english.DeleteUserData=Do you also want to delete your settings and the collected statistics?%n%n(If you choose "No", they are kept for a later reinstallation.)
 german.AutostartTask=Mit Windows starten
 german.OtherTasks=Weitere Optionen:
 german.RuntimeMissing=Speedy Monitor benötigt die .NET 8 Desktop Runtime (x64), die auf diesem PC nicht gefunden wurde.%n%nSoll die Download-Seite jetzt geöffnet werden? Nach der Installation der Runtime einfach das Setup erneut starten.
