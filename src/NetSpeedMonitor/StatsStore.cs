@@ -23,8 +23,8 @@ public sealed class StatsData
 /// </summary>
 public sealed class StatsStore
 {
-    // Genug fuer Wochen- und kompletten Kalendermonats-Wert.
-    private const int HistoryDays = 62;
+    // Gut ein Jahr fuer den Verlauf (12 Monate); ein Eintrag sind nur wenige Bytes.
+    private const int HistoryDays = 400;
 
     private static readonly string FilePath = Path.Combine(AppPaths.DataFolder, "stats.json");
 
@@ -66,6 +66,22 @@ public sealed class StatsStore
         }
         return (up, down);
     }
+
+    /// <summary>
+    /// Heute plus Historie, aeltester Tag zuerst, ein Eintrag je gespeichertem Kalendertag.
+    /// Tage ohne Eintrag fehlen (keine Null-Tage); die Eintraege sind Kopien.
+    /// </summary>
+    public IReadOnlyList<DayTotal> GetDailyTotals() =>
+        _data.History.Append(_data.Today)
+            .GroupBy(d => d.Date.Date)
+            .OrderBy(g => g.Key)
+            .Select(g => new DayTotal
+            {
+                Date = g.Key,
+                UploadBytes = g.Sum(d => d.UploadBytes),
+                DownloadBytes = g.Sum(d => d.DownloadBytes)
+            })
+            .ToList();
 
     public void AddSample(long uploadBytes, long downloadBytes)
     {
