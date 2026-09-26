@@ -1,21 +1,35 @@
-using System.Text;
+using System.Net.NetworkInformation;
+using Microsoft.Win32;
 
 namespace NetSpeedMonitor;
 
 /// <summary>
 /// Traegt die gesamte App: kein sichtbares Hauptfenster, nur das Overlay-Panel
 /// direkt neben den System-Tray-Icons (Ersatz fuer das unter Windows 11 nicht mehr
-/// moegliche Taskbar-Deskband). Das Panel selbst stellt auch das Rechtsklick-Menue
-/// (Einstellungen/Beenden) und den Doppelklick-Zugriff auf die Einstellungen bereit.
+/// moegliche Taskbar-Deskband). Das Panel ist die einzige Bedienoberflaeche:
+/// Rechtsklick = Menue, Klick = Statistik-Flyout, Doppelklick = Einstellungen.
 /// </summary>
 public sealed class TrayApplicationContext : ApplicationContext
 {
     private readonly NetworkMonitor _monitor;
     private readonly StatsStore _stats;
     private readonly TaskbarOverlayWindow _overlay;
+    private readonly ContextMenuStrip _menu;
     private readonly System.Windows.Forms.Timer _anchorRefreshTimer;
+    private readonly System.Windows.Forms.Timer _clickTimer;
+    private readonly Queue<(double Up, double Down)> _history = new();
     private AppSettings _settings;
     private int _ticksSinceSave;
+    private NetworkSample _lastSample;
+
+    private StatsFlyout? _flyout;
+    private SettingsForm? _settingsForm;
+    private AboutDialog? _aboutDialog;
+
+    private SpeedHeaderItem _headerItem = null!;
+    private ToolStripMenuItem _unitMenu = null!;
+    private ToolStripMenuItem _adapterMenu = null!;
+    private ToolStripMenuItem _autostartItem = null!;
 
     private Rectangle _taskbarRect;
     private int? _notificationAreaLeft;
@@ -23,21 +37,49 @@ public sealed class TrayApplicationContext : ApplicationContext
     private const int SaveEveryNTicks = 30;
     private const int AnchorRefreshMs = 5000;
 
+    private static readonly (SpeedUnit Unit, string Text)[] UnitChoices =
+    {
+        (SpeedUnit.Auto, "Automatisch"),
+        (SpeedUnit.KBs, "KB/s"),
+        (SpeedUnit.MBs, "MB/s"),
+        (SpeedUnit.Kbits, "kbit/s"),
+        (SpeedUnit.Mbits, "Mbit/s")
+    };
+
     public TrayApplicationContext()
     {
         _settings = SettingsStore.Load();
         _stats = new StatsStore();
 
-        var menu = BuildContextMenu();
+        _menu = BuildContextMenu();
+        MenuRenderer.Apply(_menu, ThemeHelper.GetAppPalette());
 
-        _overlay = new TaskbarOverlayWindow(menu);
-        _overlay.PanelDoubleClicked += (_, _) => OpenSettings();
+        _overlay = new TaskbarOverlayWindow(_menu);
 
+        // Einzelklick erst nach Ablauf der Doppelklickzeit auswerten, damit ein Doppelklick
+        // (Einstellungen) nicht vorher noch kurz das Flyout aufklappt.
+        _clickTimer = new System.Windows.Forms.Timer { Interval = SystemInformation.DoubleClickTime };
+        _clickTimer.Tick += (_, _) =>
+        {
+            _clickTimer.Stop();
+            if (!_menu.Visible)
+                ToggleFlyout();
+        };
+        _overlay.PanelClicked += (_, _) =>
+        {
+            _clickTimer.Stop();
+            _clickTimer.Start();
+        };
+        _overlay.PanelDoubleClicked += (_, _) =>
+        {
+            _clickTimer.Stop();
+            OpenSettings();
+        };
+
+        // Das Panel ist die einzige Bedienoberflaeche - ShowTaskbarOverlay wird daher ignoriert.
         RefreshAnchor();
         _overlay.Reposition(_taskbarRect, _notificationAreaLeft);
-        _overlay.Visible = _settings.ShowTaskbarOverlay;
-        if (_settings.ShowTaskbarOverlay)
-            _overlay.Show();
+        _overlay.Show();
 
         _monitor = new NetworkMonitor
         {
@@ -56,12 +98,12 @@ public sealed class TrayApplicationContext : ApplicationContext
         _anchorRefreshTimer.Tick += (_, _) =>
         {
             RefreshAnchor();
-            if (_overlay.Visible)
-                _overlay.Reposition(_taskbarRect, _notificationAreaLeft);
+            _overlay.Reposition(_taskbarRect, _notificationAreaLeft);
         };
         _anchorRefreshTimer.Start();
 
-        Application.ApplicationExit += (_, _) => _stats.Save();
+        SystemEvents.UserPreferenceChanged += OnUserPreferenceChanged;
+        Application.ApplicationExit += OnApplicationExit;
     }
 
     private void RefreshAnchor()
@@ -73,20 +115,134 @@ public sealed class TrayApplicationContext : ApplicationContext
     private ContextMenuStrip BuildContextMenu()
     {
         var menu = new ContextMenuStrip();
+
+        _headerItem = new SpeedHeaderItem();
+        _headerItem.SetValues(SpeedFormatter.FormatFull(0, _settings.Unit), SpeedFormatter.FormatFull(0, _settings.Unit));
+        menu.Items.Add(_headerItem);
+        menu.Items.Add(new ToolStripSeparator());
+        menu.Items.Add("Statistik anzeigen…", null, (_, _) => ShowFlyout());
+
+        _unitMenu = new ToolStripMenuItem("Einheit");
+        foreach (var (unit, text) in UnitChoices)
+            _unitMenu.DropDownItems.Add(new RadioMenuItem(text, (_, _) => SetUnit(unit)) { Tag = unit });
+        menu.Items.Add(_unitMenu);
+
+        _adapterMenu = new ToolStripMenuItem("Netzwerkadapter");
+        // Platzhalter, damit der Untermenue-Pfeil erscheint; echte Eintraege beim Oeffnen.
+        _adapterMenu.DropDownItems.Add("…");
+        menu.Items.Add(_adapterMenu);
+
+        _autostartItem = new ToolStripMenuItem("Mit Windows starten", null, (_, _) => ToggleAutostart());
+        menu.Items.Add(_autostartItem);
+
+        menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add("Einstellungen…", null, (_, _) => OpenSettings());
+        menu.Items.Add("Statistik zurücksetzen…", null, (_, _) => ConfirmResetStats());
+        menu.Items.Add("Über NetSpeed Monitor", null, (_, _) => ShowAbout());
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add("Beenden", null, (_, _) => ExitApplication());
+
+        menu.Opening += (_, _) => RefreshMenuState();
         return menu;
+    }
+
+    private void RefreshMenuState()
+    {
+        UpdateHeader();
+
+        foreach (ToolStripItem item in _unitMenu.DropDownItems)
+            if (item is ToolStripMenuItem mi)
+                mi.Checked = mi.Tag is SpeedUnit u && u == _settings.Unit;
+
+        RebuildAdapterMenu();
+        _autostartItem.Checked = AutostartHelper.IsEnabled();
+    }
+
+    private void UpdateHeader() => _headerItem.SetValues(
+        SpeedFormatter.FormatFull(_lastSample.UploadBytesPerSecond, _settings.Unit),
+        SpeedFormatter.FormatFull(_lastSample.DownloadBytesPerSecond, _settings.Unit));
+
+    private void RebuildAdapterMenu()
+    {
+        var items = _adapterMenu.DropDownItems;
+        items.Clear();
+        items.Add(new RadioMenuItem("Automatisch (alle aktiven)", (_, _) => SetAdapter("Auto"))
+        {
+            Checked = _settings.AdapterId == "Auto"
+        });
+
+        NetworkInterface[] interfaces;
+        try
+        {
+            interfaces = NetworkInterface.GetAllNetworkInterfaces();
+        }
+        catch (NetworkInformationException)
+        {
+            interfaces = Array.Empty<NetworkInterface>();
+        }
+
+        var candidates = interfaces
+            .Where(ni => ni.NetworkInterfaceType is not (NetworkInterfaceType.Loopback or NetworkInterfaceType.Tunnel))
+            .OrderByDescending(ni => ni.OperationalStatus == OperationalStatus.Up)
+            .ThenBy(ni => ni.Name)
+            .ToList();
+
+        if (candidates.Count > 0)
+            items.Add(new ToolStripSeparator());
+
+        foreach (var ni in candidates)
+        {
+            var active = ni.OperationalStatus == OperationalStatus.Up;
+            var id = ni.Id;
+            items.Add(new RadioMenuItem(active ? ni.Name : $"{ni.Name} (inaktiv)", (_, _) => SetAdapter(id))
+            {
+                Checked = _settings.AdapterId == id,
+                Enabled = active,
+                ToolTipText = ni.Description
+            });
+        }
+
+        if (_adapterMenu.DropDown is ToolStripDropDownMenu dd)
+            MenuRenderer.Apply(dd, ThemeHelper.GetAppPalette());
+    }
+
+    private void SetUnit(SpeedUnit unit)
+    {
+        _settings.Unit = unit;
+        SettingsStore.Save(_settings);
+        PushValues();
+    }
+
+    private void SetAdapter(string adapterId)
+    {
+        if (_settings.AdapterId == adapterId)
+            return;
+        _settings.AdapterId = adapterId;
+        SettingsStore.Save(_settings);
+        _monitor.AdapterId = adapterId;
+        _monitor.ResetBaseline();
+        _history.Clear();
+    }
+
+    private void ToggleAutostart()
+    {
+        _settings.AutostartEnabled = !AutostartHelper.IsEnabled();
+        AutostartHelper.SetEnabled(_settings.AutostartEnabled);
+        SettingsStore.Save(_settings);
     }
 
     private void OnSample(NetworkSample sample)
     {
         _stats.AddSample(sample.UploadBytesDelta, sample.DownloadBytesDelta);
+        _lastSample = sample;
 
-        var tooltip = BuildTooltip(sample);
+        _history.Enqueue((sample.UploadBytesPerSecond, sample.DownloadBytesPerSecond));
+        while (_history.Count > StatsFlyout.HistoryLength)
+            _history.Dequeue();
 
-        if (_settings.ShowTaskbarOverlay)
-            _overlay.UpdateValues(sample.UploadBytesPerSecond, sample.DownloadBytesPerSecond, _settings.Unit, tooltip);
+        PushValues();
+        if (_menu.Visible)
+            UpdateHeader();
 
         if (++_ticksSinceSave >= SaveEveryNTicks)
         {
@@ -95,62 +251,134 @@ public sealed class TrayApplicationContext : ApplicationContext
         }
     }
 
-    private string BuildTooltip(NetworkSample sample)
+    private void PushValues()
     {
-        var up = SpeedFormatter.FormatFull(sample.UploadBytesPerSecond, _settings.Unit);
-        var down = SpeedFormatter.FormatFull(sample.DownloadBytesPerSecond, _settings.Unit);
+        var up = _lastSample.UploadBytesPerSecond;
+        var down = _lastSample.DownloadBytesPerSecond;
+        _overlay.UpdateValues(up, down, _settings.Unit, BuildTooltip());
+        if (_flyout is { Visible: true })
+            _flyout.UpdateValues(_settings.Unit, up, down);
+    }
+
+    private string BuildTooltip()
+    {
+        var up = SpeedFormatter.FormatFull(_lastSample.UploadBytesPerSecond, _settings.Unit);
+        var down = SpeedFormatter.FormatFull(_lastSample.DownloadBytesPerSecond, _settings.Unit);
         var today = _stats.Today;
-        var week = _stats.WeekTotal();
+        return $"↑ {up}   ↓ {down}\n"
+               + $"Heute: ↑ {ByteFormatter.FormatBytes(today.UploadBytes)}   ↓ {ByteFormatter.FormatBytes(today.DownloadBytes)}";
+    }
 
-        var sb = new StringBuilder();
-        sb.Append("NetSpeed Monitor\n");
-        sb.Append($"↑ {up}   ↓ {down}\n");
-        sb.Append($"Heute: ↑{ByteFormatter.FormatBytes(today.UploadBytes)} ↓{ByteFormatter.FormatBytes(today.DownloadBytes)}\n");
-        sb.Append($"Woche: ↑{ByteFormatter.FormatBytes(week.Upload)} ↓{ByteFormatter.FormatBytes(week.Download)}");
+    private void ToggleFlyout()
+    {
+        // Ein Klick aufs Panel bei offenem Flyout kann es bereits per Fokusverlust geschlossen
+        // haben - dann soll derselbe Klick es nicht sofort wieder oeffnen.
+        if (_flyout is { Visible: false }
+            && (DateTime.UtcNow - _flyout.LastDeactivatedUtc).TotalMilliseconds < SystemInformation.DoubleClickTime + 300)
+            return;
 
-        return sb.ToString();
+        if (_flyout is { Visible: true })
+            _flyout.Dismiss();
+        else
+            ShowFlyout();
+    }
+
+    private void ShowFlyout()
+    {
+        _flyout ??= new StatsFlyout(_stats, _monitor, _history);
+        _flyout.ShowNear(_overlay.Bounds, _settings.Unit, _lastSample.UploadBytesPerSecond, _lastSample.DownloadBytesPerSecond);
     }
 
     private void OpenSettings()
     {
-        using var form = new SettingsForm(_settings);
-        if (form.ShowDialog() != DialogResult.OK)
+        _flyout?.Dismiss();
+        if (_settingsForm is { IsDisposed: false })
+        {
+            _settingsForm.WindowState = FormWindowState.Normal;
+            WindowActivation.ForceForeground(_settingsForm);
             return;
+        }
 
-        var adapterChanged = form.Result.AdapterId != _settings.AdapterId;
-        var overlayChanged = form.Result.ShowTaskbarOverlay != _settings.ShowTaskbarOverlay;
+        var form = new SettingsForm(_settings);
+        form.FormClosed += (_, _) =>
+        {
+            _settingsForm = null;
+            if (form.DialogResult == DialogResult.OK)
+                ApplySettings(form.Result);
+        };
+        _settingsForm = form;
+        form.Show();
+        WindowActivation.ForceForeground(form);
+    }
 
-        _settings = form.Result;
+    private void ApplySettings(AppSettings result)
+    {
+        var adapterChanged = result.AdapterId != _settings.AdapterId;
+
+        _settings = result;
         SettingsStore.Save(_settings);
 
         _monitor.AdapterId = _settings.AdapterId;
         _monitor.IntervalMs = _settings.UpdateIntervalMs;
         if (adapterChanged)
-            _monitor.ResetBaseline();
-
-        if (overlayChanged)
         {
-            if (_settings.ShowTaskbarOverlay)
-            {
-                RefreshAnchor();
-                _overlay.Reposition(_taskbarRect, _notificationAreaLeft);
-                _overlay.Show();
-            }
-            else
-            {
-                _overlay.Hide();
-            }
+            _monitor.ResetBaseline();
+            _history.Clear();
         }
 
         AutostartHelper.SetEnabled(_settings.AutostartEnabled);
+        PushValues();
     }
+
+    private void ConfirmResetStats()
+    {
+        var confirmed = ConfirmDialog.Ask(
+            "NetSpeed Monitor",
+            "Statistik zurücksetzen?",
+            "Alle gespeicherten Datenmengen (Sitzung, Tage, Woche und Monat) werden unwiderruflich gelöscht.",
+            "Zurücksetzen");
+        if (confirmed)
+            _stats.Reset();
+    }
+
+    private void ShowAbout()
+    {
+        if (_aboutDialog is { IsDisposed: false })
+        {
+            WindowActivation.ForceForeground(_aboutDialog);
+            return;
+        }
+        _aboutDialog = new AboutDialog();
+        _aboutDialog.FormClosed += (_, _) => _aboutDialog = null;
+        _aboutDialog.Show();
+        WindowActivation.ForceForeground(_aboutDialog);
+    }
+
+    private void OnUserPreferenceChanged(object sender, UserPreferenceChangedEventArgs e)
+    {
+        if (e.Category is not (UserPreferenceCategory.General or UserPreferenceCategory.Color or UserPreferenceCategory.VisualStyle))
+            return;
+
+        var palette = ThemeHelper.GetAppPalette();
+        MenuRenderer.Apply(_menu, palette);
+        _flyout?.ApplyPalette(palette);
+    }
+
+    private void OnApplicationExit(object? sender, EventArgs e) => _stats.Save();
 
     private void ExitApplication()
     {
+        SystemEvents.UserPreferenceChanged -= OnUserPreferenceChanged;
+        Application.ApplicationExit -= OnApplicationExit;
         _stats.Save();
+        _clickTimer.Dispose();
         _anchorRefreshTimer.Dispose();
         _monitor.Dispose();
+        _settingsForm?.Close();
+        _aboutDialog?.Close();
+        _flyout?.Dispose();
         _overlay.Dispose();
+        _menu.Dispose();
         Application.Exit();
     }
 }
