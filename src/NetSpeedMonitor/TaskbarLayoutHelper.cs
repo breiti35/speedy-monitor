@@ -73,6 +73,36 @@ public static class TaskbarLayoutHelper
         }
     }
 
+    /// <summary>"Taskleiste automatisch ausblenden" aktiv?</summary>
+    public static bool IsAutoHideEnabled()
+    {
+        const uint ABM_GETSTATE = 0x04;
+        const int ABS_AUTOHIDE = 0x01;
+        try
+        {
+            var data = new APPBARDATA { cbSize = Marshal.SizeOf<APPBARDATA>() };
+            return ((int)SHAppBarMessage(ABM_GETSTATE, ref data) & ABS_AUTOHIDE) != 0;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    [DllImport("shell32.dll")]
+    private static extern UIntPtr SHAppBarMessage(uint dwMessage, ref APPBARDATA pData);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct APPBARDATA
+    {
+        public int cbSize;
+        public IntPtr hWnd;
+        public uint uCallbackMessage;
+        public uint uEdge;
+        public RECT rc;
+        public IntPtr lParam;
+    }
+
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
     private static extern IntPtr FindWindow(string? lpClassName, string? lpWindowName);
 
