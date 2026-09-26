@@ -29,6 +29,11 @@ Taskleiste andockt (siehe Abschnitt "Technischer Hintergrund").
 - Passt sich live an hellen/dunklen Windows-Modus an
 - **Klick** aufs Panel: Statistik-Popup wie beim Original – aktuelle Raten,
   Sitzung/Heute/Woche/Monat, Live-Graph der letzten 60 Messungen, Adapter
+- **Verlauf…** (Link im Statistik-Popup): Balkendiagramm pro Tag (30/90 Tage)
+  oder pro Monat (12 Monate), Summen und Tagesdurchschnitt, CSV-Export für Excel;
+  Tageswerte werden gut ein Jahr aufbewahrt
+- Optional **auf allen Monitoren**: jede Taskleiste bekommt ihr eigenes Panel
+  (Per-Monitor-DPI, also auch bei unterschiedlicher Skalierung scharf)
 - **Doppelklick**: Einstellungen (Dark Mode, gruppiert, "Standard"-Button)
 - **Rechtsklick**: Menü mit Live-Werten, Einheit und Adapter direkt
   umschaltbar, Autostart, Statistik zurücksetzen, Über, Beenden
