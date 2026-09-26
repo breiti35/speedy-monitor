@@ -24,12 +24,15 @@ public sealed class StatsFlyout : Form
     private readonly Font _speedFont = new("Segoe UI Semibold", 15f);
     private readonly Font _textFont = new("Segoe UI", 9f);
     private readonly Font _smallFont = new("Segoe UI", 8f);
+    private readonly Font _linkHoverFont = new("Segoe UI", 8f, FontStyle.Underline);
 
     private ThemePalette _p = ThemeHelper.GetAppPalette();
     private SpeedUnit _unit;
     private double _up;
     private double _down;
     private bool _dismissing;
+    private Rectangle _historyLinkBounds;
+    private bool _historyLinkHover;
 
     /// <summary>Zeitpunkt, zu dem das Flyout zuletzt durch Fokusverlust geschlossen wurde.</summary>
     public DateTime LastDeactivatedUtc { get; private set; }
@@ -88,6 +91,7 @@ public sealed class StatsFlyout : Form
         _unit = unit;
         _up = up;
         _down = down;
+        SetHistoryLinkHover(false);
 
         var scale = DeviceDpi / 96f;
         Size = new Size((int)Math.Round(LogicalWidth * scale), MeasureHeight(scale));
@@ -132,6 +136,36 @@ public sealed class StatsFlyout : Form
             return;
         LastDeactivatedUtc = DateTime.UtcNow;
         Hide();
+    }
+
+    protected override void OnMouseMove(MouseEventArgs e)
+    {
+        base.OnMouseMove(e);
+        SetHistoryLinkHover(_historyLinkBounds.Contains(e.Location));
+    }
+
+    protected override void OnMouseLeave(EventArgs e)
+    {
+        base.OnMouseLeave(e);
+        SetHistoryLinkHover(false);
+    }
+
+    protected override void OnMouseClick(MouseEventArgs e)
+    {
+        base.OnMouseClick(e);
+        if (e.Button != MouseButtons.Left || !_historyLinkBounds.Contains(e.Location))
+            return;
+        Dismiss();
+        HistoryWindow.ShowOrActivate(_stats);
+    }
+
+    private void SetHistoryLinkHover(bool hover)
+    {
+        if (_historyLinkHover == hover)
+            return;
+        _historyLinkHover = hover;
+        Cursor = hover ? Cursors.Hand : Cursors.Default;
+        Invalidate(_historyLinkBounds);
     }
 
     protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
@@ -235,14 +269,26 @@ public sealed class StatsFlyout : Form
         using (var linePen = new Pen(_p.Border))
             g.DrawLine(linePen, 0, l.FooterLineY, ClientSize.Width, l.FooterLineY);
 
+        // Fusszeile: "Adapter · seit ..." links (Adapter wird notfalls gekuerzt), Verlauf-Link rechts.
+        const string linkText = "Verlauf…";
+        var linkFont = _historyLinkHover ? _linkHoverFont : _smallFont;
+        var linkSize = TextRenderer.MeasureText(g, linkText, linkFont, Size.Empty, TextFormatFlags.NoPadding);
+        _historyLinkBounds = new Rectangle(l.Pad + contentWidth - linkSize.Width - S(4), l.FooterY - S(3), linkSize.Width + S(8), _smallFont.Height + S(6));
+        TextRenderer.DrawText(g, linkText, linkFont,
+            new Rectangle(l.Pad, l.FooterY, contentWidth, _smallFont.Height), _p.Accent, right);
+
         var names = _monitor.MonitoredAdapterNames;
         var adapterText = names.Count == 0 ? "Kein aktiver Adapter" : string.Join(", ", names);
-        var durationText = "seit " + FormatDuration(DateTime.Now - _stats.SessionStart);
+        var durationText = " · seit " + FormatDuration(DateTime.Now - _stats.SessionStart);
         var durationWidth = TextRenderer.MeasureText(g, durationText, _smallFont, Size.Empty, TextFormatFlags.NoPadding).Width;
+        var leftWidth = contentWidth - linkSize.Width - S(12);
+        var adapterWidth = Math.Min(
+            TextRenderer.MeasureText(g, adapterText, _smallFont, Size.Empty, TextFormatFlags.NoPadding).Width,
+            Math.Max(0, leftWidth - durationWidth));
         TextRenderer.DrawText(g, adapterText, _smallFont,
-            new Rectangle(l.Pad, l.FooterY, contentWidth - durationWidth - S(12), _smallFont.Height), _p.SubtleText, left);
+            new Rectangle(l.Pad, l.FooterY, adapterWidth, _smallFont.Height), _p.SubtleText, left);
         TextRenderer.DrawText(g, durationText, _smallFont,
-            new Rectangle(l.Pad, l.FooterY, contentWidth, _smallFont.Height), _p.SubtleText, right);
+            new Rectangle(l.Pad + adapterWidth, l.FooterY, leftWidth - adapterWidth, _smallFont.Height), _p.SubtleText, left);
     }
 
     private void DrawGraph(Graphics g, Rectangle rect, float scale)
@@ -320,6 +366,7 @@ public sealed class StatsFlyout : Form
             _speedFont.Dispose();
             _textFont.Dispose();
             _smallFont.Dispose();
+            _linkHoverFont.Dispose();
         }
         base.Dispose(disposing);
     }
