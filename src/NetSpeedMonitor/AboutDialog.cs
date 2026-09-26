@@ -39,11 +39,36 @@ public sealed class AboutDialog : Form
         });
         var versionLabel = new Label { Text = $"Version {version}", AutoSize = true, Margin = new Padding(0, 0, 0, 12) };
         layout.Controls.Add(versionLabel);
+
+        var creditsLabel = new Label
+        {
+            Text = "Entwickler: breiti35\nCode-Mitarbeit: Claude (Anthropic)",
+            AutoSize = true,
+            Margin = new Padding(0, 0, 0, 16)
+        };
+        layout.Controls.Add(creditsLabel);
+
         layout.Controls.Add(new Label
         {
-            Text = "Zeigt die aktuelle Upload- und Download-Geschwindigkeit direkt in der Taskleiste an – "
-                 + "ein Nachbau des klassischen NetSpeedMonitor für Windows 11. Klick auf das Panel öffnet "
-                 + "die Statistik, Doppelklick die Einstellungen, Rechtsklick das Menü.",
+            Text = "Wie es dazu kam",
+            AutoSize = true,
+            Font = new Font("Segoe UI Semibold", 10f),
+            Margin = new Padding(0, 0, 0, 4)
+        });
+        layout.Controls.Add(new Label
+        {
+            Text = "Unter Windows 10 hatte ich immer den NetSpeed Monitor unten in der Taskleiste – ein kurzer "
+                 + "Blick genügte, und ich wusste, was im Netzwerk los ist. Mit Windows 11 war damit Schluss: "
+                 + "Die Technik dahinter gibt es nicht mehr, und keine der Alternativen hat mich wirklich überzeugt. "
+                 + "Also habe ich mir gedacht: Dann baue ich mir eben selbst eins – genau so, wie ich es haben will.",
+            AutoSize = true,
+            MaximumSize = new Size(400, 0),
+            Margin = new Padding(0, 0, 0, 16)
+        });
+
+        layout.Controls.Add(new Label
+        {
+            Text = "Klick auf das Panel öffnet die Statistik, Doppelklick die Einstellungen, Rechtsklick das Menü.",
             AutoSize = true,
             MaximumSize = new Size(400, 0),
             Margin = new Padding(0, 0, 0, 16)
@@ -77,6 +102,7 @@ public sealed class AboutDialog : Form
         ThemeHelper.ApplyControlTheme(this, _palette);
         ThemeHelper.StylePrimaryButton(close, _palette);
         versionLabel.ForeColor = _palette.SubtleText;
+        creditsLabel.ForeColor = _palette.SubtleText;
         folderCaption.ForeColor = _palette.SubtleText;
         ResumeLayout(true);
     }

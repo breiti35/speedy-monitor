@@ -1,5 +1,17 @@
 # Speedy Monitor
 
+**Version 1.0** · Entwickler: breiti35 · Code-Mitarbeit: Claude (Anthropic)
+
+## Wie es dazu kam
+
+Unter Windows 10 hatte ich immer den NetSpeed Monitor unten in der Taskleiste –
+ein kurzer Blick genügte, und ich wusste, was im Netzwerk los ist. Mit Windows 11
+war damit Schluss: Die Technik dahinter gibt es nicht mehr, und keine der
+Alternativen hat mich wirklich überzeugt. Also habe ich mir gedacht: Dann baue
+ich mir eben selbst eins – genau so, wie ich es haben will.
+
+## Was es ist
+
 Schlanker Nachbau des klassischen Windows-NetSpeedMonitor: eine Textanzeige
 ("↑ ... / ↓ ...") direkt in der Taskleiste, neben Netzwerk/Lautstärke/Uhr.
 Das Original lief als Taskbar-Deskband – eine Technik, die Windows 11

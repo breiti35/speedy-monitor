@@ -243,8 +243,9 @@ public sealed class TrayApplicationContext : ApplicationContext
         var up = _lastSample.UploadBytesPerSecond;
         var down = _lastSample.DownloadBytesPerSecond;
         var flyoutOpen = _flyout is { Visible: true };
-        // Bei offenem Flyout wuerde der Tooltip sich darueber legen - die Werte stehen dort ohnehin.
-        _overlay.UpdateValues(up, down, _settings.Unit, flyoutOpen ? string.Empty : BuildTooltip());
+        // Bei offenem Flyout/Menue wuerde der Tooltip sich darueber legen - die Werte stehen dort ohnehin.
+        var hideTooltip = flyoutOpen || _menu.Visible;
+        _overlay.UpdateValues(up, down, _settings.Unit, hideTooltip ? string.Empty : BuildTooltip());
         if (flyoutOpen)
             _flyout!.UpdateValues(_settings.Unit, up, down);
     }
