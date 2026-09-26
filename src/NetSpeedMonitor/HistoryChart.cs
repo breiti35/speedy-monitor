@@ -1,5 +1,4 @@
 using System.Drawing.Drawing2D;
-using System.Globalization;
 using System.Linq;
 
 namespace NetSpeedMonitor;
@@ -10,8 +9,6 @@ public readonly record struct HistoryBucket(DateTime Start, long Upload, long Do
 /// <summary>Owner-drawn Balkendiagramm (Upload/Download nebeneinander) mit Hover-Details.</summary>
 public sealed class HistoryChart : Control
 {
-    private static readonly CultureInfo German = CultureInfo.GetCultureInfo("de-DE");
-
     private static readonly int[] DayLabelSteps = { 1, 2, 3, 5, 7, 14, 15, 30 };
     private static readonly int[] MonthLabelSteps = { 1, 2, 3, 4, 6, 12 };
 
@@ -96,7 +93,7 @@ public sealed class HistoryChart : Control
         var fontHeight = _font.Height;
 
         // Kopfzeile: Aufloesung links, Legende rechts
-        TextRenderer.DrawText(g, _monthly ? "Pro Monat" : "Pro Tag", _font, new Point(pad, pad), _p.SubtleText, flags);
+        TextRenderer.DrawText(g, _monthly ? L.PerMonth : L.PerDay, _font, new Point(pad, pad), _p.SubtleText, flags);
         var legendX = Width - pad;
         foreach (var (text, color) in new[] { ("Download", _p.Download), ("Upload", _p.Upload) })
         {
@@ -190,8 +187,8 @@ public sealed class HistoryChart : Control
 
     private void DrawXLabels(Graphics g, int plotLeft, float slot, int y, int pad, TextFormatFlags flags)
     {
-        var format = _monthly ? "MMM yy" : "dd.MM.";
-        var sample = _monthly ? "Sept. 26" : "28.08.";
+        var format = _monthly ? "MMM yy" : L.AxisDayFormat;
+        var sample = _monthly ? "Sept. 26" : L.AxisDaySample;
         var needed = TextRenderer.MeasureText(g, sample, _font, Size.Empty, flags).Width * 1.4f;
         var steps = _monthly ? MonthLabelSteps : DayLabelSteps;
         var k = steps.FirstOrDefault(s => s * slot >= needed);
@@ -202,7 +199,7 @@ public sealed class HistoryChart : Control
         var lastLeft = int.MaxValue;
         for (var i = _buckets.Count - 1; i >= 0; i -= k)
         {
-            var text = _buckets[i].Start.ToString(format, German);
+            var text = _buckets[i].Start.ToString(format, L.Culture);
             var w = TextRenderer.MeasureText(g, text, _font, Size.Empty, flags).Width;
             var center = plotLeft + (i + 0.5f) * slot;
             var x = (int)Math.Round(center - w / 2f);
@@ -220,20 +217,20 @@ public sealed class HistoryChart : Control
         const TextFormatFlags flags = TextFormatFlags.NoPadding | TextFormatFlags.SingleLine;
 
         var title = _monthly
-            ? b.Start.ToString("MMMM yyyy", German)
-            : b.Start.ToString("dddd, dd.MM.yyyy", German);
+            ? b.Start.ToString("MMMM yyyy", L.Culture)
+            : b.Start.ToString(L.TooltipDayFormat, L.Culture);
 
         var rows = new List<(string Label, string Value, Color Color)>();
         if (b.DaysWithData == 0)
         {
-            rows.Add(("Keine Daten", "", _p.SubtleText));
+            rows.Add((L.NoData, "", _p.SubtleText));
         }
         else
         {
             rows.Add(("↑ Upload", ByteFormatter.FormatBytes(b.Upload), _p.Upload));
             rows.Add(("↓ Download", ByteFormatter.FormatBytes(b.Download), _p.Download));
             if (_monthly)
-                rows.Add((b.DaysWithData == 1 ? "1 Tag erfasst" : $"{b.DaysWithData} Tage erfasst", "", _p.SubtleText));
+                rows.Add((L.DaysRecorded(b.DaysWithData), "", _p.SubtleText));
         }
 
         var pad = S(10);

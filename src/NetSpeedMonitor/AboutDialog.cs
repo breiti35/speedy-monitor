@@ -16,7 +16,7 @@ public sealed class AboutDialog : Form
         AutoScaleDimensions = new SizeF(96f, 96f);
         AutoScaleMode = AutoScaleMode.Dpi;
         Font = new Font("Segoe UI", 9f);
-        Text = "Über Speedy Monitor";
+        Text = L.MenuAbout;
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox = false;
         MinimizeBox = false;
@@ -37,12 +37,12 @@ public sealed class AboutDialog : Form
             Font = new Font("Segoe UI Semibold", 14f),
             Margin = new Padding(0, 0, 0, 2)
         });
-        var versionLabel = new Label { Text = $"Version {version}", AutoSize = true, Margin = new Padding(0, 0, 0, 12) };
+        var versionLabel = new Label { Text = L.Version(version), AutoSize = true, Margin = new Padding(0, 0, 0, 12) };
         layout.Controls.Add(versionLabel);
 
         var creditsLabel = new Label
         {
-            Text = "Entwickler: breiti35\nCode-Mitarbeit: Claude (Anthropic)",
+            Text = L.Credits,
             AutoSize = true,
             Margin = new Padding(0, 0, 0, 16)
         };
@@ -50,17 +50,14 @@ public sealed class AboutDialog : Form
 
         layout.Controls.Add(new Label
         {
-            Text = "Wie es dazu kam",
+            Text = L.StoryHeading,
             AutoSize = true,
             Font = new Font("Segoe UI Semibold", 10f),
             Margin = new Padding(0, 0, 0, 4)
         });
         layout.Controls.Add(new Label
         {
-            Text = "Unter Windows 10 hatte ich immer den NetSpeed Monitor unten in der Taskleiste – ein kurzer "
-                 + "Blick genügte, und ich wusste, was im Netzwerk los ist. Mit Windows 11 war damit Schluss: "
-                 + "Die Technik dahinter gibt es nicht mehr, und keine der Alternativen hat mich wirklich überzeugt. "
-                 + "Also habe ich mir gedacht: Dann baue ich mir eben selbst eins – genau so, wie ich es haben will.",
+            Text = L.Story,
             AutoSize = true,
             MaximumSize = new Size(400, 0),
             Margin = new Padding(0, 0, 0, 16)
@@ -68,12 +65,12 @@ public sealed class AboutDialog : Form
 
         layout.Controls.Add(new Label
         {
-            Text = "Klick auf das Panel öffnet die Statistik, Doppelklick die Einstellungen, Rechtsklick das Menü.",
+            Text = L.UsageHint,
             AutoSize = true,
             MaximumSize = new Size(400, 0),
             Margin = new Padding(0, 0, 0, 16)
         });
-        var folderCaption = new Label { Text = "Datenordner (Einstellungen und Statistik):", AutoSize = true, Margin = new Padding(0, 0, 0, 4) };
+        var folderCaption = new Label { Text = L.DataFolderCaption, AutoSize = true, Margin = new Padding(0, 0, 0, 4) };
         layout.Controls.Add(folderCaption);
         layout.Controls.Add(new Label { Text = DataFolder, AutoSize = true, MaximumSize = new Size(400, 0), Margin = new Padding(0, 0, 0, 20) });
 
@@ -87,8 +84,8 @@ public sealed class AboutDialog : Form
         buttons.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         buttons.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         buttons.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-        var openFolder = new Button { Text = "Ordner öffnen", AutoSize = true, MinimumSize = new Size(92, 30), Padding = new Padding(8, 0, 8, 0), Margin = Padding.Empty };
-        var close = new Button { Text = "Schließen", AutoSize = true, MinimumSize = new Size(92, 30), Margin = Padding.Empty };
+        var openFolder = new Button { Text = L.OpenFolder, AutoSize = true, MinimumSize = new Size(92, 30), Padding = new Padding(8, 0, 8, 0), Margin = Padding.Empty };
+        var close = new Button { Text = L.Close, AutoSize = true, MinimumSize = new Size(92, 30), Margin = Padding.Empty };
         openFolder.Click += (_, _) => OpenDataFolder();
         close.Click += (_, _) => Close();
         buttons.Controls.Add(openFolder, 0, 0);

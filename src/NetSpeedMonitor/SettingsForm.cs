@@ -6,9 +6,10 @@ public sealed class SettingsForm : Form
 {
     private readonly ComboBox _adapterCombo = new() { DropDownStyle = ComboBoxStyle.DropDownList };
     private readonly ComboBox _unitCombo = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 220 };
+    private readonly ComboBox _languageCombo = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 220 };
     private readonly NumericUpDown _intervalUpDown = new() { Minimum = 250, Maximum = 5000, Increment = 250, Width = 90, TextAlign = HorizontalAlignment.Right };
-    private readonly CheckBox _allMonitorsCheck = new() { Text = "Auf allen Monitoren anzeigen", AutoSize = true };
-    private readonly CheckBox _autostartCheck = new() { Text = "Mit Windows starten", AutoSize = true };
+    private readonly CheckBox _allMonitorsCheck = new() { Text = L.MenuAllMonitors, AutoSize = true };
+    private readonly CheckBox _autostartCheck = new() { Text = L.MenuAutostart, AutoSize = true };
     private readonly List<string> _adapterIds = new();
     private readonly ThemePalette _palette = ThemeHelper.GetAppPalette();
 
@@ -22,7 +23,7 @@ public sealed class SettingsForm : Form
         AutoScaleDimensions = new SizeF(96f, 96f);
         AutoScaleMode = AutoScaleMode.Dpi;
         Font = new Font("Segoe UI", 9f);
-        Text = "Speedy Monitor – Einstellungen";
+        Text = L.SettingsTitle;
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox = false;
         MinimizeBox = false;
@@ -44,26 +45,27 @@ public sealed class SettingsForm : Form
         grid.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         grid.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
 
-        var measureHeader = SectionHeader("Messung", topMargin: 0);
+        var measureHeader = SectionHeader(L.GroupMeasurement, topMargin: 0);
         grid.Controls.Add(measureHeader);
         grid.SetColumnSpan(measureHeader, 2);
-        AddRow(grid, "Netzwerkadapter", _adapterCombo);
-        AddRow(grid, "Einheit", _unitCombo);
+        AddRow(grid, L.MenuAdapter, _adapterCombo);
+        AddRow(grid, L.MenuUnit, _unitCombo);
 
         var intervalPanel = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Margin = new Padding(0, 4, 0, 4) };
         _intervalUpDown.Margin = Padding.Empty;
         intervalPanel.Controls.Add(_intervalUpDown);
         intervalPanel.Controls.Add(new Label { Text = "ms", AutoSize = true, Anchor = AnchorStyles.Left, Margin = new Padding(6, 0, 0, 0) });
-        AddRow(grid, "Aktualisierungsintervall", intervalPanel);
+        AddRow(grid, L.UpdateInterval, intervalPanel);
 
-        var displayHeader = SectionHeader("Anzeige", topMargin: 18);
+        var displayHeader = SectionHeader(L.GroupDisplay, topMargin: 18);
         grid.Controls.Add(displayHeader);
         grid.SetColumnSpan(displayHeader, 2);
+        AddRow(grid, L.LanguageLabel, _languageCombo);
         _allMonitorsCheck.Margin = new Padding(0, 4, 0, 4);
         grid.Controls.Add(_allMonitorsCheck);
         grid.SetColumnSpan(_allMonitorsCheck, 2);
 
-        var systemHeader = SectionHeader("System", topMargin: 18);
+        var systemHeader = SectionHeader(L.GroupSystem, topMargin: 18);
         grid.Controls.Add(systemHeader);
         grid.SetColumnSpan(systemHeader, 2);
         _autostartCheck.Margin = new Padding(0, 4, 0, 4);
@@ -83,9 +85,9 @@ public sealed class SettingsForm : Form
         buttons.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         buttons.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
 
-        var defaultsButton = DialogButton("Standard");
+        var defaultsButton = DialogButton(L.Defaults);
         var okButton = DialogButton("OK");
-        var cancelButton = DialogButton("Abbrechen");
+        var cancelButton = DialogButton(L.Cancel);
         okButton.Margin = new Padding(0, 0, 8, 0);
         defaultsButton.Click += (_, _) => LoadValues(new AppSettings());
         okButton.Click += (_, _) =>
@@ -110,6 +112,7 @@ public sealed class SettingsForm : Form
         CancelButton = cancelButton;
 
         PopulateUnits();
+        _languageCombo.Items.AddRange(new object[] { L.LanguageAuto, L.LanguageGerman, L.LanguageEnglish });
         PopulateAdapters();
         LoadValues(current);
         SizeAdapterCombo();
@@ -162,7 +165,7 @@ public sealed class SettingsForm : Form
 
     private void PopulateAdapters()
     {
-        _adapterCombo.Items.Add("Automatisch (alle aktiven Adapter)");
+        _adapterCombo.Items.Add(L.AdapterAutoLong);
         _adapterIds.Add("Auto");
 
         var interfaces = NetworkInterface.GetAllNetworkInterfaces()
@@ -172,7 +175,7 @@ public sealed class SettingsForm : Form
 
         foreach (var ni in interfaces)
         {
-            var status = ni.OperationalStatus == OperationalStatus.Up ? "aktiv" : "inaktiv";
+            var status = ni.OperationalStatus == OperationalStatus.Up ? L.Active : L.Inactive;
             _adapterCombo.Items.Add($"{ni.Name} ({ni.Description}) – {status}");
             _adapterIds.Add(ni.Id);
         }
@@ -198,7 +201,7 @@ public sealed class SettingsForm : Form
     {
         _unitCombo.Items.AddRange(new object[]
         {
-            "Automatisch (B/s, KB/s, MB/s)",
+            L.UnitAuto,
             "KB/s",
             "MB/s",
             "kbit/s",
@@ -219,6 +222,8 @@ public sealed class SettingsForm : Form
             _ => 0
         };
         _intervalUpDown.Value = Math.Clamp(values.UpdateIntervalMs, 250, 5000);
+        // Reihenfolge der Eintraege entspricht den Enum-Werten Auto/German/English.
+        _languageCombo.SelectedIndex = Enum.IsDefined(values.Language) ? (int)values.Language : 0;
         _allMonitorsCheck.Checked = values.ShowOnAllMonitors;
         _autostartCheck.Checked = values.AutostartEnabled;
     }
@@ -235,6 +240,7 @@ public sealed class SettingsForm : Form
             _ => SpeedUnit.Auto
         };
         Result.UpdateIntervalMs = (int)_intervalUpDown.Value;
+        Result.Language = (AppLanguage)_languageCombo.SelectedIndex;
         Result.ShowOnAllMonitors = _allMonitorsCheck.Checked;
         Result.AutostartEnabled = _autostartCheck.Checked;
         // Das Panel ist die einzige Bedienoberflaeche und darf daher nie abgeschaltet sein.

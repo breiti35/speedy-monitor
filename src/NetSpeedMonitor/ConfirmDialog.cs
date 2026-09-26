@@ -47,7 +47,7 @@ public sealed class ConfirmDialog : Form
             Anchor = AnchorStyles.Right,
             Margin = Padding.Empty
         };
-        var cancel = new Button { Text = "Abbrechen", AutoSize = true, MinimumSize = new Size(92, 30), DialogResult = DialogResult.Cancel, Margin = Padding.Empty };
+        var cancel = new Button { Text = L.Cancel, AutoSize = true, MinimumSize = new Size(92, 30), DialogResult = DialogResult.Cancel, Margin = Padding.Empty };
         var confirm = new Button { Text = confirmText, AutoSize = true, MinimumSize = new Size(92, 30), DialogResult = DialogResult.OK, Margin = new Padding(0, 0, 8, 0) };
         buttons.Controls.Add(cancel);
         buttons.Controls.Add(confirm);

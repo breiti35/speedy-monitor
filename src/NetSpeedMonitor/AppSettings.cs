@@ -20,6 +20,7 @@ public sealed class AppSettings
     public bool AutostartEnabled { get; set; } = false;
     public bool ShowTaskbarOverlay { get; set; } = true;
     public bool ShowOnAllMonitors { get; set; } = false;
+    public AppLanguage Language { get; set; } = AppLanguage.Auto;
 
     public AppSettings Clone() => new()
     {
@@ -28,7 +29,8 @@ public sealed class AppSettings
         UpdateIntervalMs = UpdateIntervalMs,
         AutostartEnabled = AutostartEnabled,
         ShowTaskbarOverlay = ShowTaskbarOverlay,
-        ShowOnAllMonitors = ShowOnAllMonitors
+        ShowOnAllMonitors = ShowOnAllMonitors,
+        Language = Language
     };
 }
 
@@ -62,6 +64,8 @@ public static class SettingsStore
         settings.UpdateIntervalMs = Math.Clamp(settings.UpdateIntervalMs, 250, 5000);
         if (!Enum.IsDefined(settings.Unit))
             settings.Unit = SpeedUnit.Auto;
+        if (!Enum.IsDefined(settings.Language))
+            settings.Language = AppLanguage.Auto;
         if (string.IsNullOrWhiteSpace(settings.AdapterId))
             settings.AdapterId = "Auto";
         return settings;
