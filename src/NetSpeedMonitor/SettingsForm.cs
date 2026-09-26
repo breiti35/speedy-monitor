@@ -4,12 +4,12 @@ namespace NetSpeedMonitor;
 
 public sealed class SettingsForm : Form
 {
-    private readonly ComboBox _adapterCombo = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 300 };
-    private readonly ComboBox _unitCombo = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 300 };
-    private readonly NumericUpDown _intervalUpDown = new() { Minimum = 250, Maximum = 5000, Increment = 250, Width = 300 };
+    private readonly ComboBox _adapterCombo = new() { DropDownStyle = ComboBoxStyle.DropDownList };
+    private readonly ComboBox _unitCombo = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 220 };
+    private readonly NumericUpDown _intervalUpDown = new() { Minimum = 250, Maximum = 5000, Increment = 250, Width = 90, TextAlign = HorizontalAlignment.Right };
     private readonly CheckBox _autostartCheck = new() { Text = "Mit Windows starten", AutoSize = true };
-    private readonly CheckBox _overlayCheck = new() { Text = "Textanzeige in der Taskleiste (neben der Uhr)", AutoSize = true };
     private readonly List<string> _adapterIds = new();
+    private readonly ThemePalette _palette = ThemeHelper.GetAppPalette();
 
     public AppSettings Result { get; }
 
@@ -17,75 +17,147 @@ public sealed class SettingsForm : Form
     {
         Result = current.Clone();
 
+        SuspendLayout();
+        AutoScaleDimensions = new SizeF(96f, 96f);
+        AutoScaleMode = AutoScaleMode.Dpi;
+        Font = new Font("Segoe UI", 9f);
         Text = "NetSpeed Monitor – Einstellungen";
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox = false;
         MinimizeBox = false;
-        ShowInTaskbar = false;
+        ShowInTaskbar = true;
         StartPosition = FormStartPosition.CenterScreen;
-        ClientSize = new Size(346, 290);
-        Font = SystemFonts.MessageBoxFont;
+        AutoSize = true;
+        AutoSizeMode = AutoSizeMode.GrowAndShrink;
+        Padding = new Padding(20, 16, 20, 16);
+        ThemeHelper.ApplyAppIcon(this);
 
-        var layout = new TableLayoutPanel
+        var grid = new TableLayoutPanel
         {
-            Dock = DockStyle.Top,
-            ColumnCount = 1,
             AutoSize = true,
-            Padding = new Padding(14, 14, 14, 0)
+            AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            ColumnCount = 2,
+            Dock = DockStyle.Fill,
+            Margin = Padding.Empty
         };
-        layout.Controls.Add(Label("Netzwerkadapter:"));
-        layout.Controls.Add(_adapterCombo);
-        layout.Controls.Add(Label("Einheit:", topMargin: 12));
-        layout.Controls.Add(_unitCombo);
-        layout.Controls.Add(Label("Aktualisierungsintervall (ms):", topMargin: 12));
-        layout.Controls.Add(_intervalUpDown);
-        _overlayCheck.Margin = new Padding(0, 16, 0, 0);
-        layout.Controls.Add(_overlayCheck);
-        _autostartCheck.Margin = new Padding(0, 8, 0, 0);
-        layout.Controls.Add(_autostartCheck);
+        grid.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        grid.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
 
-        var buttonPanel = new FlowLayoutPanel
+        var measureHeader = SectionHeader("Messung", topMargin: 0);
+        grid.Controls.Add(measureHeader);
+        grid.SetColumnSpan(measureHeader, 2);
+        AddRow(grid, "Netzwerkadapter", _adapterCombo);
+        AddRow(grid, "Einheit", _unitCombo);
+
+        var intervalPanel = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Margin = new Padding(0, 4, 0, 4) };
+        _intervalUpDown.Margin = Padding.Empty;
+        intervalPanel.Controls.Add(_intervalUpDown);
+        intervalPanel.Controls.Add(new Label { Text = "ms", AutoSize = true, Anchor = AnchorStyles.Left, Margin = new Padding(6, 0, 0, 0) });
+        AddRow(grid, "Aktualisierungsintervall", intervalPanel);
+
+        var systemHeader = SectionHeader("System", topMargin: 18);
+        grid.Controls.Add(systemHeader);
+        grid.SetColumnSpan(systemHeader, 2);
+        _autostartCheck.Margin = new Padding(0, 4, 0, 4);
+        grid.Controls.Add(_autostartCheck);
+        grid.SetColumnSpan(_autostartCheck, 2);
+
+        var buttons = new TableLayoutPanel
         {
-            FlowDirection = FlowDirection.RightToLeft,
-            Dock = DockStyle.Bottom,
-            Height = 44,
-            Padding = new Padding(14, 8, 14, 8)
+            AutoSize = true,
+            AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            ColumnCount = 4,
+            Anchor = AnchorStyles.Left | AnchorStyles.Right,
+            Margin = new Padding(0, 22, 0, 0)
         };
-        var okButton = new Button { Text = "OK", DialogResult = DialogResult.OK, Width = 84 };
-        var cancelButton = new Button { Text = "Abbrechen", DialogResult = DialogResult.Cancel, Width = 84, Margin = new Padding(0, 0, 8, 0) };
-        okButton.Click += (_, _) => ApplyToResult();
-        buttonPanel.Controls.Add(okButton);
-        buttonPanel.Controls.Add(cancelButton);
+        buttons.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        buttons.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        buttons.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        buttons.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
 
-        Controls.Add(layout);
-        Controls.Add(buttonPanel);
+        var defaultsButton = DialogButton("Standard");
+        var okButton = DialogButton("OK");
+        var cancelButton = DialogButton("Abbrechen");
+        okButton.Margin = new Padding(0, 0, 8, 0);
+        defaultsButton.Click += (_, _) => LoadValues(new AppSettings());
+        okButton.Click += (_, _) =>
+        {
+            ApplyToResult();
+            DialogResult = DialogResult.OK;
+            Close();
+        };
+        cancelButton.Click += (_, _) =>
+        {
+            DialogResult = DialogResult.Cancel;
+            Close();
+        };
+        buttons.Controls.Add(defaultsButton, 0, 0);
+        buttons.Controls.Add(okButton, 2, 0);
+        buttons.Controls.Add(cancelButton, 3, 0);
+        grid.Controls.Add(buttons);
+        grid.SetColumnSpan(buttons, 2);
+
+        Controls.Add(grid);
         AcceptButton = okButton;
         CancelButton = cancelButton;
 
-        PopulateAdapters(current.AdapterId);
-        PopulateUnits(current.Unit);
-        _intervalUpDown.Value = Math.Clamp(current.UpdateIntervalMs, 250, 5000);
-        _autostartCheck.Checked = current.AutostartEnabled;
-        _overlayCheck.Checked = current.ShowTaskbarOverlay;
+        PopulateUnits();
+        PopulateAdapters();
+        LoadValues(current);
+        SizeAdapterCombo();
+
+        ThemeHelper.ApplyControlTheme(this, _palette);
+        ThemeHelper.StylePrimaryButton(okButton, _palette);
+        measureHeader.ForeColor = _palette.Text;
+        systemHeader.ForeColor = _palette.Text;
+        ResumeLayout(true);
     }
 
-    private static Label Label(string text, int topMargin = 0) => new()
+    protected override void OnHandleCreated(EventArgs e)
+    {
+        base.OnHandleCreated(e);
+        ThemeHelper.ApplyTitleBarTheme(this, _palette.IsDark);
+    }
+
+    private static Label SectionHeader(string text, int topMargin) => new()
     {
         Text = text,
         AutoSize = true,
-        Margin = new Padding(0, topMargin, 0, 4)
+        Font = new Font("Segoe UI Semibold", 10.5f),
+        Margin = new Padding(0, topMargin, 0, 8)
     };
 
-    private void PopulateAdapters(string currentId)
+    private static void AddRow(TableLayoutPanel grid, string label, Control control)
     {
-        _adapterCombo.Items.Clear();
-        _adapterIds.Clear();
+        grid.Controls.Add(new Label
+        {
+            Text = label,
+            AutoSize = true,
+            Anchor = AnchorStyles.Left,
+            Margin = new Padding(0, 4, 24, 4)
+        });
+        control.Anchor = AnchorStyles.Left;
+        if (control is ComboBox)
+            control.Margin = new Padding(0, 4, 0, 4);
+        grid.Controls.Add(control);
+    }
 
+    private static Button DialogButton(string text) => new()
+    {
+        Text = text,
+        AutoSize = true,
+        MinimumSize = new Size(92, 30),
+        Padding = new Padding(8, 0, 8, 0),
+        Margin = Padding.Empty
+    };
+
+    private void PopulateAdapters()
+    {
         _adapterCombo.Items.Add("Automatisch (alle aktiven Adapter)");
         _adapterIds.Add("Auto");
 
         var interfaces = NetworkInterface.GetAllNetworkInterfaces()
-            .Where(ni => ni.NetworkInterfaceType != NetworkInterfaceType.Loopback)
+            .Where(ni => ni.NetworkInterfaceType is not (NetworkInterfaceType.Loopback or NetworkInterfaceType.Tunnel))
             .OrderByDescending(ni => ni.OperationalStatus == OperationalStatus.Up)
             .ThenBy(ni => ni.Name);
 
@@ -95,12 +167,25 @@ public sealed class SettingsForm : Form
             _adapterCombo.Items.Add($"{ni.Name} ({ni.Description}) – {status}");
             _adapterIds.Add(ni.Id);
         }
-
-        var index = _adapterIds.IndexOf(currentId);
-        _adapterCombo.SelectedIndex = index >= 0 ? index : 0;
     }
 
-    private void PopulateUnits(SpeedUnit current)
+    /// <summary>
+    /// Breite am laengsten Eintrag ausrichten. Gemessen wird in Geraetepixeln, die Groesse
+    /// wird aber vor der DPI-Skalierung gesetzt - daher zurueck auf 96 dpi umrechnen.
+    /// </summary>
+    private void SizeAdapterCombo()
+    {
+        var scale = DeviceDpi / 96f;
+        var longest = _adapterCombo.Items.Cast<object>()
+            .Select(o => TextRenderer.MeasureText(o.ToString(), Font).Width)
+            .DefaultIfEmpty(0)
+            .Max();
+        var logicalLongest = (int)Math.Ceiling(longest / scale) + 32;
+        _adapterCombo.Width = Math.Clamp(logicalLongest, 300, 420);
+        _adapterCombo.DropDownWidth = Math.Max(_adapterCombo.Width, logicalLongest);
+    }
+
+    private void PopulateUnits()
     {
         _unitCombo.Items.AddRange(new object[]
         {
@@ -110,8 +195,13 @@ public sealed class SettingsForm : Form
             "kbit/s",
             "Mbit/s"
         });
+    }
 
-        _unitCombo.SelectedIndex = current switch
+    private void LoadValues(AppSettings values)
+    {
+        var index = _adapterIds.IndexOf(values.AdapterId);
+        _adapterCombo.SelectedIndex = index >= 0 ? index : 0;
+        _unitCombo.SelectedIndex = values.Unit switch
         {
             SpeedUnit.KBs => 1,
             SpeedUnit.MBs => 2,
@@ -119,6 +209,8 @@ public sealed class SettingsForm : Form
             SpeedUnit.Mbits => 4,
             _ => 0
         };
+        _intervalUpDown.Value = Math.Clamp(values.UpdateIntervalMs, 250, 5000);
+        _autostartCheck.Checked = values.AutostartEnabled;
     }
 
     private void ApplyToResult()
@@ -134,6 +226,7 @@ public sealed class SettingsForm : Form
         };
         Result.UpdateIntervalMs = (int)_intervalUpDown.Value;
         Result.AutostartEnabled = _autostartCheck.Checked;
-        Result.ShowTaskbarOverlay = _overlayCheck.Checked;
+        // Das Panel ist die einzige Bedienoberflaeche und darf daher nie abgeschaltet sein.
+        Result.ShowTaskbarOverlay = true;
     }
 }
