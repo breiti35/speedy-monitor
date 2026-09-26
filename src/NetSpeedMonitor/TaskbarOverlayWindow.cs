@@ -54,8 +54,12 @@ public sealed class TaskbarOverlayWindow : Form
     public event EventHandler? PanelClicked;
     public event EventHandler? PanelDoubleClicked;
 
-    public TaskbarOverlayWindow(ContextMenuStrip contextMenu)
+    /// <summary>Die Taskleiste (Shell_TrayWnd bzw. Shell_SecondaryTrayWnd), an der dieses Panel haengt.</summary>
+    public IntPtr TaskbarHandle { get; }
+
+    public TaskbarOverlayWindow(ContextMenuStrip contextMenu, IntPtr taskbarHandle)
     {
+        TaskbarHandle = taskbarHandle;
         FormBorderStyle = FormBorderStyle.None;
         ShowInTaskbar = false;
         TopMost = true;
@@ -270,7 +274,7 @@ public sealed class TaskbarOverlayWindow : Form
 
     private void RefreshTaskbarGeometry()
     {
-        var rect = TaskbarLayoutHelper.GetTaskbarRect();
+        var rect = TaskbarLayoutHelper.GetWindowBounds(TaskbarHandle);
         if (rect is { } r && r != _taskbarRect)
         {
             var wasSuppressed = IsSuppressed;

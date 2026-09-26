@@ -13,7 +13,8 @@ public sealed class TrayApplicationContext : ApplicationContext
 {
     private readonly NetworkMonitor _monitor;
     private readonly StatsStore _stats;
-    private readonly TaskbarOverlayWindow _overlay;
+    // Primaere Taskleiste zuerst; weitere nur bei "Auf allen Monitoren anzeigen".
+    private List<TaskbarOverlayWindow> _overlays = new();
     private readonly ContextMenuStrip _menu;
     private readonly System.Windows.Forms.Timer _anchorRefreshTimer;
     private readonly Queue<(double Up, double Down)> _history = new();
@@ -22,6 +23,7 @@ public sealed class TrayApplicationContext : ApplicationContext
     private NetworkSample _lastSample;
 
     private StatsFlyout? _flyout;
+    private TaskbarOverlayWindow? _flyoutOwner;
     private SettingsForm? _settingsForm;
     private AboutDialog? _aboutDialog;
 
@@ -29,9 +31,8 @@ public sealed class TrayApplicationContext : ApplicationContext
     private ToolStripMenuItem _unitMenu = null!;
     private ToolStripMenuItem _adapterMenu = null!;
     private ToolStripMenuItem _autostartItem = null!;
-
-    private Rectangle _taskbarRect;
-    private int? _notificationAreaLeft;
+    private ToolStripMenuItem _allMonitorsItem = null!;
+    private readonly SynchronizationContext? _uiContext;
 
     private const int SaveEveryNTicks = 30;
     private const int AnchorRefreshMs = 5000;
@@ -53,20 +54,10 @@ public sealed class TrayApplicationContext : ApplicationContext
         _menu = BuildContextMenu();
         MenuRenderer.Apply(_menu, ThemeHelper.GetAppPalette());
 
-        _overlay = new TaskbarOverlayWindow(_menu);
-
-        // Das Overlay meldet PanelClicked bereits erst nach Ablauf der Doppelklickzeit.
-        _overlay.PanelClicked += (_, _) =>
-        {
-            if (!_menu.Visible)
-                ToggleFlyout();
-        };
-        _overlay.PanelDoubleClicked += (_, _) => OpenSettings();
+        _uiContext = SynchronizationContext.Current;
 
         // Das Panel ist die einzige Bedienoberflaeche - ShowTaskbarOverlay wird daher ignoriert.
-        RefreshAnchor();
-        _overlay.Reposition(_taskbarRect, _notificationAreaLeft);
-        _overlay.Show();
+        ReconcileOverlays();
 
         _monitor = new NetworkMonitor
         {
@@ -82,21 +73,73 @@ public sealed class TrayApplicationContext : ApplicationContext
         // Taskleisten-/Tray-Position ist normalerweise stabil, kann sich aber durch
         // Aufloesungswechsel, Monitorwechsel oder einen Explorer-Neustart aendern.
         _anchorRefreshTimer = new System.Windows.Forms.Timer { Interval = AnchorRefreshMs };
-        _anchorRefreshTimer.Tick += (_, _) =>
-        {
-            RefreshAnchor();
-            _overlay.Reposition(_taskbarRect, _notificationAreaLeft);
-        };
+        _anchorRefreshTimer.Tick += (_, _) => ReconcileOverlays();
         _anchorRefreshTimer.Start();
 
         SystemEvents.UserPreferenceChanged += OnUserPreferenceChanged;
+        SystemEvents.DisplaySettingsChanged += OnDisplaySettingsChanged;
         Application.ApplicationExit += OnApplicationExit;
     }
 
-    private void RefreshAnchor()
+    /// <summary>
+    /// Ein Panel je Taskleiste. Zuordnung ueber das Taskleisten-HWND: ein Explorer-Neustart
+    /// oder Monitorwechsel erzeugt neue HWNDs, deren Panels dann neu angelegt werden;
+    /// unveraenderte Taskleisten behalten ihr Panel und werden nur neu ausgerichtet.
+    /// </summary>
+    private void ReconcileOverlays()
     {
-        _taskbarRect = TaskbarLayoutHelper.GetTaskbarRect() ?? _taskbarRect;
-        _notificationAreaLeft = TaskbarLayoutHelper.GetNotificationAreaLeft(_taskbarRect);
+        var taskbars = TaskbarLayoutHelper.GetTaskbars(_settings.ShowOnAllMonitors);
+        // Explorer startet gerade (neu) - bisherige Panels bis zum naechsten Durchlauf behalten.
+        if (taskbars.Count == 0)
+            return;
+
+        var next = new List<TaskbarOverlayWindow>(taskbars.Count);
+        var created = false;
+        foreach (var taskbar in taskbars)
+        {
+            var overlay = _overlays.Find(o => o.TaskbarHandle == taskbar.Handle);
+            if (overlay is null)
+            {
+                overlay = CreateOverlay(taskbar.Handle);
+                created = true;
+            }
+            overlay.Reposition(taskbar.Bounds, taskbar.AnchorRight);
+            if (!overlay.Visible)
+                overlay.Show();
+            next.Add(overlay);
+        }
+
+        foreach (var stale in _overlays.Except(next))
+        {
+            if (_flyoutOwner == stale)
+                _flyoutOwner = null;
+            stale.Dispose();
+        }
+
+        _overlays = next;
+        if (created)
+            PushValues();
+    }
+
+    private TaskbarOverlayWindow CreateOverlay(IntPtr taskbarHandle)
+    {
+        var overlay = new TaskbarOverlayWindow(_menu, taskbarHandle);
+        // Das Overlay meldet PanelClicked bereits erst nach Ablauf der Doppelklickzeit.
+        overlay.PanelClicked += (sender, _) =>
+        {
+            if (!_menu.Visible)
+                ToggleFlyout((TaskbarOverlayWindow)sender!);
+        };
+        overlay.PanelDoubleClicked += (_, _) => OpenSettings();
+        return overlay;
+    }
+
+    private void OnDisplaySettingsChanged(object? sender, EventArgs e)
+    {
+        if (_uiContext is not null && SynchronizationContext.Current != _uiContext)
+            _uiContext.Post(_ => ReconcileOverlays(), null);
+        else
+            ReconcileOverlays();
     }
 
     private ContextMenuStrip BuildContextMenu()
@@ -107,7 +150,7 @@ public sealed class TrayApplicationContext : ApplicationContext
         _headerItem.SetValues(SpeedFormatter.FormatFull(0, _settings.Unit), SpeedFormatter.FormatFull(0, _settings.Unit));
         menu.Items.Add(_headerItem);
         menu.Items.Add(new ToolStripSeparator());
-        menu.Items.Add("Statistik anzeigen…", null, (_, _) => ShowFlyout());
+        menu.Items.Add("Statistik anzeigen…", null, (_, _) => ShowFlyout(menu.SourceControl as TaskbarOverlayWindow));
 
         _unitMenu = new ToolStripMenuItem("Einheit");
         foreach (var (unit, text) in UnitChoices)
@@ -121,6 +164,9 @@ public sealed class TrayApplicationContext : ApplicationContext
 
         _autostartItem = new ToolStripMenuItem("Mit Windows starten", null, (_, _) => ToggleAutostart());
         menu.Items.Add(_autostartItem);
+
+        _allMonitorsItem = new ToolStripMenuItem("Auf allen Monitoren anzeigen", null, (_, _) => ToggleAllMonitors());
+        menu.Items.Add(_allMonitorsItem);
 
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add("Einstellungen…", null, (_, _) => OpenSettings());
@@ -143,6 +189,7 @@ public sealed class TrayApplicationContext : ApplicationContext
 
         RebuildAdapterMenu();
         _autostartItem.Checked = AutostartHelper.IsEnabled();
+        _allMonitorsItem.Checked = _settings.ShowOnAllMonitors;
     }
 
     private void UpdateHeader() => _headerItem.SetValues(
@@ -218,6 +265,13 @@ public sealed class TrayApplicationContext : ApplicationContext
         SettingsStore.Save(_settings);
     }
 
+    private void ToggleAllMonitors()
+    {
+        _settings.ShowOnAllMonitors = !_settings.ShowOnAllMonitors;
+        SettingsStore.Save(_settings);
+        ReconcileOverlays();
+    }
+
     private void OnSample(NetworkSample sample)
     {
         _stats.AddSample(sample.UploadBytesDelta, sample.DownloadBytesDelta);
@@ -245,7 +299,9 @@ public sealed class TrayApplicationContext : ApplicationContext
         var flyoutOpen = _flyout is { Visible: true };
         // Bei offenem Flyout/Menue wuerde der Tooltip sich darueber legen - die Werte stehen dort ohnehin.
         var hideTooltip = flyoutOpen || _menu.Visible;
-        _overlay.UpdateValues(up, down, _settings.Unit, hideTooltip ? string.Empty : BuildTooltip());
+        var tooltip = hideTooltip ? string.Empty : BuildTooltip();
+        foreach (var overlay in _overlays)
+            overlay.UpdateValues(up, down, _settings.Unit, tooltip);
         if (flyoutOpen)
             _flyout!.UpdateValues(_settings.Unit, up, down);
     }
@@ -259,24 +315,30 @@ public sealed class TrayApplicationContext : ApplicationContext
                + $"Heute: ↑ {ByteFormatter.FormatBytes(today.UploadBytes)}   ↓ {ByteFormatter.FormatBytes(today.DownloadBytes)}";
     }
 
-    private void ToggleFlyout()
+    private void ToggleFlyout(TaskbarOverlayWindow source)
     {
         // Ein Klick aufs Panel bei offenem Flyout kann es bereits per Fokusverlust geschlossen
-        // haben - dann soll derselbe Klick es nicht sofort wieder oeffnen.
-        if (_flyout is { Visible: false }
+        // haben - dann soll derselbe Klick es nicht sofort wieder oeffnen. Gilt nur fuer das
+        // Panel, an dem es hing: ein Klick auf ein anderes Panel holt es dorthin.
+        if (_flyout is { Visible: false } && source == _flyoutOwner
             && (DateTime.UtcNow - _flyout.LastDeactivatedUtc).TotalMilliseconds < SystemInformation.DoubleClickTime + 300)
             return;
 
-        if (_flyout is { Visible: true })
+        if (_flyout is { Visible: true } && source == _flyoutOwner)
             _flyout.Dismiss();
         else
-            ShowFlyout();
+            ShowFlyout(source);
     }
 
-    private void ShowFlyout()
+    private void ShowFlyout(TaskbarOverlayWindow? source)
     {
+        var anchor = source is { IsDisposed: false } ? source : _overlays.FirstOrDefault();
+        if (anchor is null)
+            return;
+
         _flyout ??= new StatsFlyout(_stats, _monitor, _history);
-        _flyout.ShowNear(_overlay.Bounds, _settings.Unit, _lastSample.UploadBytesPerSecond, _lastSample.DownloadBytesPerSecond);
+        _flyoutOwner = anchor;
+        _flyout.ShowNear(anchor.Bounds, _settings.Unit, _lastSample.UploadBytesPerSecond, _lastSample.DownloadBytesPerSecond);
     }
 
     private void OpenSettings()
@@ -317,6 +379,7 @@ public sealed class TrayApplicationContext : ApplicationContext
         }
 
         AutostartHelper.SetEnabled(_settings.AutostartEnabled);
+        ReconcileOverlays();
         PushValues();
     }
 
@@ -359,6 +422,7 @@ public sealed class TrayApplicationContext : ApplicationContext
     private void ExitApplication()
     {
         SystemEvents.UserPreferenceChanged -= OnUserPreferenceChanged;
+        SystemEvents.DisplaySettingsChanged -= OnDisplaySettingsChanged;
         Application.ApplicationExit -= OnApplicationExit;
         _stats.Save();
         _anchorRefreshTimer.Dispose();
@@ -366,7 +430,9 @@ public sealed class TrayApplicationContext : ApplicationContext
         _settingsForm?.Close();
         _aboutDialog?.Close();
         _flyout?.Dispose();
-        _overlay.Dispose();
+        foreach (var overlay in _overlays)
+            overlay.Dispose();
+        _overlays.Clear();
         _menu.Dispose();
         Application.Exit();
     }

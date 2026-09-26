@@ -7,6 +7,7 @@ public sealed class SettingsForm : Form
     private readonly ComboBox _adapterCombo = new() { DropDownStyle = ComboBoxStyle.DropDownList };
     private readonly ComboBox _unitCombo = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 220 };
     private readonly NumericUpDown _intervalUpDown = new() { Minimum = 250, Maximum = 5000, Increment = 250, Width = 90, TextAlign = HorizontalAlignment.Right };
+    private readonly CheckBox _allMonitorsCheck = new() { Text = "Auf allen Monitoren anzeigen", AutoSize = true };
     private readonly CheckBox _autostartCheck = new() { Text = "Mit Windows starten", AutoSize = true };
     private readonly List<string> _adapterIds = new();
     private readonly ThemePalette _palette = ThemeHelper.GetAppPalette();
@@ -54,6 +55,13 @@ public sealed class SettingsForm : Form
         intervalPanel.Controls.Add(_intervalUpDown);
         intervalPanel.Controls.Add(new Label { Text = "ms", AutoSize = true, Anchor = AnchorStyles.Left, Margin = new Padding(6, 0, 0, 0) });
         AddRow(grid, "Aktualisierungsintervall", intervalPanel);
+
+        var displayHeader = SectionHeader("Anzeige", topMargin: 18);
+        grid.Controls.Add(displayHeader);
+        grid.SetColumnSpan(displayHeader, 2);
+        _allMonitorsCheck.Margin = new Padding(0, 4, 0, 4);
+        grid.Controls.Add(_allMonitorsCheck);
+        grid.SetColumnSpan(_allMonitorsCheck, 2);
 
         var systemHeader = SectionHeader("System", topMargin: 18);
         grid.Controls.Add(systemHeader);
@@ -109,6 +117,7 @@ public sealed class SettingsForm : Form
         ThemeHelper.ApplyControlTheme(this, _palette);
         ThemeHelper.StylePrimaryButton(okButton, _palette);
         measureHeader.ForeColor = _palette.Text;
+        displayHeader.ForeColor = _palette.Text;
         systemHeader.ForeColor = _palette.Text;
         ResumeLayout(true);
     }
@@ -210,6 +219,7 @@ public sealed class SettingsForm : Form
             _ => 0
         };
         _intervalUpDown.Value = Math.Clamp(values.UpdateIntervalMs, 250, 5000);
+        _allMonitorsCheck.Checked = values.ShowOnAllMonitors;
         _autostartCheck.Checked = values.AutostartEnabled;
     }
 
@@ -225,6 +235,7 @@ public sealed class SettingsForm : Form
             _ => SpeedUnit.Auto
         };
         Result.UpdateIntervalMs = (int)_intervalUpDown.Value;
+        Result.ShowOnAllMonitors = _allMonitorsCheck.Checked;
         Result.AutostartEnabled = _autostartCheck.Checked;
         // Das Panel ist die einzige Bedienoberflaeche und darf daher nie abgeschaltet sein.
         Result.ShowTaskbarOverlay = true;

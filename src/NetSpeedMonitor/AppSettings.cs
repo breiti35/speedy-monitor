@@ -19,6 +19,7 @@ public sealed class AppSettings
     public int UpdateIntervalMs { get; set; } = 1000;
     public bool AutostartEnabled { get; set; } = false;
     public bool ShowTaskbarOverlay { get; set; } = true;
+    public bool ShowOnAllMonitors { get; set; } = false;
 
     public AppSettings Clone() => new()
     {
@@ -26,7 +27,8 @@ public sealed class AppSettings
         Unit = Unit,
         UpdateIntervalMs = UpdateIntervalMs,
         AutostartEnabled = AutostartEnabled,
-        ShowTaskbarOverlay = ShowTaskbarOverlay
+        ShowTaskbarOverlay = ShowTaskbarOverlay,
+        ShowOnAllMonitors = ShowOnAllMonitors
     };
 }
 
