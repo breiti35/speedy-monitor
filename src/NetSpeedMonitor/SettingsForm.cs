@@ -21,7 +21,7 @@ public sealed class SettingsForm : Form
         AutoScaleDimensions = new SizeF(96f, 96f);
         AutoScaleMode = AutoScaleMode.Dpi;
         Font = new Font("Segoe UI", 9f);
-        Text = "NetSpeed Monitor – Einstellungen";
+        Text = "Speedy Monitor – Einstellungen";
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox = false;
         MinimizeBox = false;

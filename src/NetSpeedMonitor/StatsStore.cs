@@ -26,9 +26,7 @@ public sealed class StatsStore
     // Genug fuer Wochen- und kompletten Kalendermonats-Wert.
     private const int HistoryDays = 62;
 
-    private static readonly string FilePath = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-        "NetSpeedMonitor", "stats.json");
+    private static readonly string FilePath = Path.Combine(AppPaths.DataFolder, "stats.json");
 
     private readonly StatsData _data;
 

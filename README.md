@@ -1,4 +1,4 @@
-# NetSpeed Monitor
+# Speedy Monitor
 
 Schlanker Nachbau des klassischen Windows-NetSpeedMonitor: eine Textanzeige
 ("↑ ... / ↓ ...") direkt in der Taskleiste, neben Netzwerk/Lautstärke/Uhr.
@@ -22,7 +22,7 @@ Taskleiste andockt (siehe Abschnitt "Technischer Hintergrund").
   umschaltbar, Autostart, Statistik zurücksetzen, Über, Beenden
 - Zählt IPv4 + IPv6; im Automatik-Modus werden virtuelle Switches
   (Hyper-V, WSL, VirtualBox, VMware) ignoriert, damit VM-Traffic nicht doppelt zählt
-- Nur eine Instanz; Fehler landen in `%AppData%\NetSpeedMonitor\error.log`,
+- Nur eine Instanz; Fehler landen in `%AppData%\SpeedyMonitor\error.log`,
   Einstellungen/Statistik werden absturzsicher (atomar) gespeichert
 
 Kein Tray-/Systray-Icon mehr – die komplette Bedienung läuft über das
@@ -30,7 +30,7 @@ Taskleisten-Panel selbst.
 
 ## Starten
 
-Fertig gebaute Version liegt unter `publish\NetSpeedMonitor.exe` – einfach
+Fertig gebaute Version liegt unter `publish\SpeedyMonitor.exe` – einfach
 doppelklicken. Das Panel erscheint automatisch links neben den System-Tray-
 Icons.
 
@@ -81,6 +81,6 @@ die mit dem SDK mitkommt).
 - `MenuRenderer.cs` – Kontextmenü im Windows-11-Stil
 - `SettingsForm.cs`, `AboutDialog.cs`, `ConfirmDialog.cs` – Dialoge
 - `ThemeHelper.cs` – Hell/Dunkel-Paletten, dunkle Titelleisten, abgerundete Ecken
-- `StatsStore.cs` – Sitzungs-/Tages-/Wochen-/Monats-Traffic (`%AppData%\NetSpeedMonitor\stats.json`)
-- `AppSettings.cs` – Einstellungen (`%AppData%\NetSpeedMonitor\settings.json`)
+- `StatsStore.cs` – Sitzungs-/Tages-/Wochen-/Monats-Traffic (`%AppData%\SpeedyMonitor\stats.json`)
+- `AppSettings.cs` – Einstellungen (`%AppData%\SpeedyMonitor\settings.json`)
 - `AppLog.cs`, `AppIconProvider.cs`, `AutostartHelper.cs`, `Formatting.cs`, `WindowActivation.cs` – Hilfsklassen

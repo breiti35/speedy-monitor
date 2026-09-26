@@ -2,16 +2,14 @@ using System.IO;
 
 namespace NetSpeedMonitor;
 
-/// <summary>Minimales Fehlerprotokoll unter %AppData%\NetSpeedMonitor\error.log. Wirft nie.</summary>
+/// <summary>Minimales Fehlerprotokoll unter %AppData%\SpeedyMonitor\error.log. Wirft nie.</summary>
 public static class AppLog
 {
     private const long MaxBytes = 256 * 1024;
 
     private static readonly object Sync = new();
 
-    private static readonly string FilePath = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-        "NetSpeedMonitor", "error.log");
+    private static readonly string FilePath = Path.Combine(AppPaths.DataFolder, "error.log");
 
     public static void Error(string context, Exception? ex = null)
     {

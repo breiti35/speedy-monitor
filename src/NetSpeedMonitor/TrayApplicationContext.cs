@@ -125,7 +125,7 @@ public sealed class TrayApplicationContext : ApplicationContext
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add("Einstellungen…", null, (_, _) => OpenSettings());
         menu.Items.Add("Statistik zurücksetzen…", null, (_, _) => ConfirmResetStats());
-        menu.Items.Add("Über NetSpeed Monitor", null, (_, _) => ShowAbout());
+        menu.Items.Add("Über Speedy Monitor", null, (_, _) => ShowAbout());
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add("Beenden", null, (_, _) => ExitApplication());
 
@@ -322,7 +322,7 @@ public sealed class TrayApplicationContext : ApplicationContext
     private void ConfirmResetStats()
     {
         var confirmed = ConfirmDialog.Ask(
-            "NetSpeed Monitor",
+            "Speedy Monitor",
             "Statistik zurücksetzen?",
             "Alle gespeicherten Datenmengen (Sitzung, Tage, Woche und Monat) werden unwiderruflich gelöscht.",
             "Zurücksetzen");

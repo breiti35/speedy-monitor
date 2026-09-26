@@ -6,7 +6,8 @@ namespace NetSpeedMonitor;
 public static class AutostartHelper
 {
     private const string RunKeyPath = @"Software\Microsoft\Windows\CurrentVersion\Run";
-    private const string ValueName = "NetSpeedMonitor";
+    private const string ValueName = "SpeedyMonitor";
+    private const string LegacyValueName = "NetSpeedMonitor";
 
     public static bool IsEnabled()
     {
@@ -30,6 +31,9 @@ public static class AutostartHelper
         {
             using var key = Registry.CurrentUser.OpenSubKey(RunKeyPath, writable: true)
                              ?? Registry.CurrentUser.CreateSubKey(RunKeyPath);
+
+            // Eintrag aus der Zeit vor der Umbenennung zeigt auf eine nicht mehr existierende exe.
+            key.DeleteValue(LegacyValueName, throwOnMissingValue: false);
 
             if (enabled)
                 key.SetValue(ValueName, $"\"{GetExePath()}\"");

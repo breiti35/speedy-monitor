@@ -32,9 +32,7 @@ public sealed class AppSettings
 
 public static class SettingsStore
 {
-    private static readonly string FilePath = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-        "NetSpeedMonitor", "settings.json");
+    private static readonly string FilePath = Path.Combine(AppPaths.DataFolder, "settings.json");
 
     public static AppSettings Load()
     {

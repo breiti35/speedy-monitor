@@ -10,8 +10,10 @@
     <UseWPF>true</UseWPF>
     <ImplicitUsings>enable</ImplicitUsings>
     <ApplicationIcon>AppIcon.ico</ApplicationIcon>
-    <Product>NetSpeed Monitor</Product>
-    <AssemblyTitle>NetSpeed Monitor</AssemblyTitle>
+    <AssemblyName>SpeedyMonitor</AssemblyName>
+    <RootNamespace>NetSpeedMonitor</RootNamespace>
+    <Product>Speedy Monitor</Product>
+    <AssemblyTitle>Speedy Monitor</AssemblyTitle>
     <Version>1.1.0</Version>
   </PropertyGroup>
 

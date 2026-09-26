@@ -6,9 +6,11 @@ static class Program
     static void Main()
     {
         // Eine zweite Instanz wuerde ein zweites, ueberlappendes Panel in die Taskleiste legen.
-        using var mutex = new Mutex(initiallyOwned: true, @"Local\NetSpeedMonitor_SingleInstance", out var createdNew);
+        using var mutex = new Mutex(initiallyOwned: true, @"Local\SpeedyMonitor_SingleInstance", out var createdNew);
         if (!createdNew)
             return;
+
+        AppPaths.MigrateLegacyDataFolder();
 
         // Hintergrund-Tool: transiente UIA/COM-Fehler im UI-Thread nur protokollieren, nicht beenden.
         Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);

@@ -45,7 +45,7 @@ public sealed class StatsFlyout : Form
         TopMost = true;
         StartPosition = FormStartPosition.Manual;
         KeyPreview = true;
-        Text = "NetSpeed Monitor – Statistik";
+        Text = "Speedy Monitor – Statistik";
         DoubleBuffered = true;
         SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
         BackColor = _p.Surface;
@@ -191,7 +191,7 @@ public sealed class StatsFlyout : Form
         const TextFormatFlags left = TextFormatFlags.Left | TextFormatFlags.NoPadding | TextFormatFlags.EndEllipsis | TextFormatFlags.SingleLine;
         const TextFormatFlags right = TextFormatFlags.Right | TextFormatFlags.NoPadding | TextFormatFlags.SingleLine;
 
-        TextRenderer.DrawText(g, "NetSpeed Monitor", _titleFont, new Rectangle(l.Pad, l.TitleY, contentWidth, _titleFont.Height), _p.Text, left);
+        TextRenderer.DrawText(g, "Speedy Monitor", _titleFont, new Rectangle(l.Pad, l.TitleY, contentWidth, _titleFont.Height), _p.Text, left);
 
         // Aktuelle Geschwindigkeit, gross
         TextRenderer.DrawText(g, "Upload", _smallFont, new Rectangle(l.Pad, l.CaptionY, half, _smallFont.Height), _p.SubtleText, left);

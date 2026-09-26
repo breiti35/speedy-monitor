@@ -6,8 +6,7 @@ namespace NetSpeedMonitor;
 
 public sealed class AboutDialog : Form
 {
-    private static readonly string DataFolder = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "NetSpeedMonitor");
+    private static readonly string DataFolder = AppPaths.DataFolder;
 
     private readonly ThemePalette _palette = ThemeHelper.GetAppPalette();
 
@@ -17,7 +16,7 @@ public sealed class AboutDialog : Form
         AutoScaleDimensions = new SizeF(96f, 96f);
         AutoScaleMode = AutoScaleMode.Dpi;
         Font = new Font("Segoe UI", 9f);
-        Text = "Über NetSpeed Monitor";
+        Text = "Über Speedy Monitor";
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox = false;
         MinimizeBox = false;
@@ -33,7 +32,7 @@ public sealed class AboutDialog : Form
         var layout = new TableLayoutPanel { AutoSize = true, ColumnCount = 1, Dock = DockStyle.Fill, Margin = Padding.Empty };
         layout.Controls.Add(new Label
         {
-            Text = "NetSpeed Monitor",
+            Text = "Speedy Monitor",
             AutoSize = true,
             Font = new Font("Segoe UI Semibold", 14f),
             Margin = new Padding(0, 0, 0, 2)
