@@ -9,22 +9,21 @@ Taskleiste andockt (siehe Abschnitt "Technischer Hintergrund").
 
 ## Funktionen
 
-- Textanzeige direkt in der Taskleiste: `↑ 2,5 KB/s` / `↓ 107,2 KB/s`,
-  fett, farbcodiert (orange = Upload, grün = Download), fest angedockt
-  links neben Netzwerk/Lautstärke/Uhr
-- Feste Panelgröße – wechselt die Ziffernanzahl (z. B. `9,9 KB/s` →
-  `123,4 KB/s`), bewegt oder verschiebt sich das Panel nicht
-- Bleibt zuverlässig über der Taskleiste sichtbar (reasserted sich aktiv
-  als Topmost-Fenster, da Windows 11 die Taskleiste selbst bevorzugt)
-- Passt sich automatisch an hellen/dunklen Windows-Anzeigemodus an
-- Tooltip beim Hovern mit exakten Werten sowie Tages- und Wochen-Traffic
-- Rechtsklick auf das Panel → Einstellungen/Beenden; Doppelklick öffnet
-  direkt die Einstellungen
-- Netzwerkadapter wählbar (Einstellungen), Standard: alle aktiven Adapter kombiniert
-- Einheit umschaltbar: Automatisch, KB/s, MB/s, kbit/s, Mbit/s
-- Aktualisierungsintervall einstellbar (250–5000 ms)
-- Autostart mit Windows
-- Panel bei Bedarf komplett abschaltbar (Einstellungen)
+- Textanzeige direkt auf der Taskleiste (transparentes Layered Window, kein
+  Kasten): ▲/▼ farbcodiert (orange = Upload, grün = Download), Zahlen und
+  Einheiten in festen Spalten ausgerichtet – das Panel bewegt sich nie
+- Bleibt zuverlässig über der Taskleiste sichtbar, blendet sich aber bei
+  Vollbild-Apps (Spiele, Videos) und automatisch ausgeblendeter Taskleiste aus
+- Passt sich live an hellen/dunklen Windows-Modus an
+- **Klick** aufs Panel: Statistik-Popup wie beim Original – aktuelle Raten,
+  Sitzung/Heute/Woche/Monat, Live-Graph der letzten 60 Messungen, Adapter
+- **Doppelklick**: Einstellungen (Dark Mode, gruppiert, "Standard"-Button)
+- **Rechtsklick**: Menü mit Live-Werten, Einheit und Adapter direkt
+  umschaltbar, Autostart, Statistik zurücksetzen, Über, Beenden
+- Zählt IPv4 + IPv6; im Automatik-Modus werden virtuelle Switches
+  (Hyper-V, WSL, VirtualBox, VMware) ignoriert, damit VM-Traffic nicht doppelt zählt
+- Nur eine Instanz; Fehler landen in `%AppData%\NetSpeedMonitor\error.log`,
+  Einstellungen/Statistik werden absturzsicher (atomar) gespeichert
 
 Kein Tray-/Systray-Icon mehr – die komplette Bedienung läuft über das
 Taskleisten-Panel selbst.
@@ -73,12 +72,15 @@ die mit dem SDK mitkommt).
 
 ## Projektstruktur
 
-- `TrayApplicationContext.cs` – Einstiegspunkt der Anwendung, verbindet Overlay, Monitor und Menü
+- `Program.cs` – Einstieg, Einzelinstanz-Mutex, globale Fehlerbehandlung
+- `TrayApplicationContext.cs` – verbindet Overlay, Monitor, Kontextmenü, Flyout und Dialoge
 - `NetworkMonitor.cs` – pollt `NetworkInterface`-Zähler und berechnet die Transferrate
-- `TaskbarOverlayWindow.cs` – randloses Panel mit der Live-Textanzeige, feste Größe, haelt sich selbst im Vordergrund
-- `TaskbarLayoutHelper.cs` – ermittelt Taskleisten- und Tray-Cluster-Position für die Andockung
-- `Formatting.cs` – Zahlenformatierung für Panel und Tooltip
-- `StatsStore.cs` – Tages-/Wochen-Traffic-Persistenz (`%AppData%\NetSpeedMonitor\stats.json`)
-- `AppSettings.cs` – Einstellungen-Modell und Persistenz (`%AppData%\NetSpeedMonitor\settings.json`)
-- `SettingsForm.cs` – Einstellungsdialog
-- `AutostartHelper.cs` – Autostart-Registry-Eintrag
+- `TaskbarOverlayWindow.cs`, `Overlay*.cs` – Layered-Window-Panel, Rendering, Topmost-/Vollbild-Logik
+- `TaskbarLayoutHelper.cs` – Taskleisten- und Tray-Cluster-Position, Auto-Hide-Erkennung
+- `StatsFlyout.cs` – Statistik-Popup mit Live-Graph
+- `MenuRenderer.cs` – Kontextmenü im Windows-11-Stil
+- `SettingsForm.cs`, `AboutDialog.cs`, `ConfirmDialog.cs` – Dialoge
+- `ThemeHelper.cs` – Hell/Dunkel-Paletten, dunkle Titelleisten, abgerundete Ecken
+- `StatsStore.cs` – Sitzungs-/Tages-/Wochen-/Monats-Traffic (`%AppData%\NetSpeedMonitor\stats.json`)
+- `AppSettings.cs` – Einstellungen (`%AppData%\NetSpeedMonitor\settings.json`)
+- `AppLog.cs`, `AppIconProvider.cs`, `AutostartHelper.cs`, `Formatting.cs`, `WindowActivation.cs` – Hilfsklassen

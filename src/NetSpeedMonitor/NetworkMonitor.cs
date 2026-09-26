@@ -69,8 +69,17 @@ public sealed class NetworkMonitor : IDisposable
                          && ni.NetworkInterfaceType != NetworkInterfaceType.Loopback
                          && ni.NetworkInterfaceType != NetworkInterfaceType.Tunnel);
 
-        return AdapterId == "Auto" ? all : all.Where(ni => ni.Id == AdapterId);
+        return AdapterId == "Auto" ? all.Where(ni => !IsVirtualSwitch(ni)) : all.Where(ni => ni.Id == AdapterId);
     }
+
+    // VM-/WSL-Traffic laeuft ueber den virtuellen Switch UND die echte Karte - im Automatik-Modus
+    // wuerde er sonst doppelt gezaehlt. Explizit gewaehlt bleibt jeder Adapter messbar.
+    private static readonly string[] VirtualSwitchMarkers =
+        { "Hyper-V Virtual Ethernet", "VirtualBox", "VMware", "WSL" };
+
+    private static bool IsVirtualSwitch(NetworkInterface ni) =>
+        VirtualSwitchMarkers.Any(m => ni.Description.Contains(m, StringComparison.OrdinalIgnoreCase)
+                                      || ni.Name.Contains(m, StringComparison.OrdinalIgnoreCase));
 
     // IPv4 + IPv6. Ein Adapter kann zwischen Aufzaehlung und Abfrage verschwinden -> dann ueberspringen.
     private static bool TryGetCounters(NetworkInterface ni, out (long Sent, long Received) counters)

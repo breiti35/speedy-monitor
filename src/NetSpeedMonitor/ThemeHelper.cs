@@ -85,7 +85,7 @@ public static class ThemeHelper
     {
         try
         {
-            form.Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath);
+            form.Icon = AppIconProvider.Get();
         }
         catch
         {

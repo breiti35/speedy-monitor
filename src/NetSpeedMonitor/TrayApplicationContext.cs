@@ -16,7 +16,6 @@ public sealed class TrayApplicationContext : ApplicationContext
     private readonly TaskbarOverlayWindow _overlay;
     private readonly ContextMenuStrip _menu;
     private readonly System.Windows.Forms.Timer _anchorRefreshTimer;
-    private readonly System.Windows.Forms.Timer _clickTimer;
     private readonly Queue<(double Up, double Down)> _history = new();
     private AppSettings _settings;
     private int _ticksSinceSave;
@@ -56,25 +55,13 @@ public sealed class TrayApplicationContext : ApplicationContext
 
         _overlay = new TaskbarOverlayWindow(_menu);
 
-        // Einzelklick erst nach Ablauf der Doppelklickzeit auswerten, damit ein Doppelklick
-        // (Einstellungen) nicht vorher noch kurz das Flyout aufklappt.
-        _clickTimer = new System.Windows.Forms.Timer { Interval = SystemInformation.DoubleClickTime };
-        _clickTimer.Tick += (_, _) =>
+        // Das Overlay meldet PanelClicked bereits erst nach Ablauf der Doppelklickzeit.
+        _overlay.PanelClicked += (_, _) =>
         {
-            _clickTimer.Stop();
             if (!_menu.Visible)
                 ToggleFlyout();
         };
-        _overlay.PanelClicked += (_, _) =>
-        {
-            _clickTimer.Stop();
-            _clickTimer.Start();
-        };
-        _overlay.PanelDoubleClicked += (_, _) =>
-        {
-            _clickTimer.Stop();
-            OpenSettings();
-        };
+        _overlay.PanelDoubleClicked += (_, _) => OpenSettings();
 
         // Das Panel ist die einzige Bedienoberflaeche - ShowTaskbarOverlay wird daher ignoriert.
         RefreshAnchor();
@@ -255,9 +242,11 @@ public sealed class TrayApplicationContext : ApplicationContext
     {
         var up = _lastSample.UploadBytesPerSecond;
         var down = _lastSample.DownloadBytesPerSecond;
-        _overlay.UpdateValues(up, down, _settings.Unit, BuildTooltip());
-        if (_flyout is { Visible: true })
-            _flyout.UpdateValues(_settings.Unit, up, down);
+        var flyoutOpen = _flyout is { Visible: true };
+        // Bei offenem Flyout wuerde der Tooltip sich darueber legen - die Werte stehen dort ohnehin.
+        _overlay.UpdateValues(up, down, _settings.Unit, flyoutOpen ? string.Empty : BuildTooltip());
+        if (flyoutOpen)
+            _flyout!.UpdateValues(_settings.Unit, up, down);
     }
 
     private string BuildTooltip()
@@ -371,7 +360,6 @@ public sealed class TrayApplicationContext : ApplicationContext
         SystemEvents.UserPreferenceChanged -= OnUserPreferenceChanged;
         Application.ApplicationExit -= OnApplicationExit;
         _stats.Save();
-        _clickTimer.Dispose();
         _anchorRefreshTimer.Dispose();
         _monitor.Dispose();
         _settingsForm?.Close();
