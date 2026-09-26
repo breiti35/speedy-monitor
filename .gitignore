@@ -5,3 +5,4 @@ publish/
 .vs/
 .claude/
 installer/Output/
+publish-standalone/

@@ -1,6 +1,54 @@
 # Speedy Monitor
 
-**Version 1.0** · Entwickler: breiti35 · Code-Mitarbeit: Claude (Anthropic)
+**Die Netzwerk-Geschwindigkeit direkt in der Windows-11-Taskleiste – wie früher der NetSpeed Monitor.**
+
+![Speedy Monitor in der Taskleiste](docs/images/taskleiste-zoom.png)
+
+## Funktionen
+
+- **Live-Anzeige in der Taskleiste**, direkt neben den Tray-Symbolen:
+  ▲ Upload (orange) und ▼ Download (grün) – ohne Kasten, passend zum hellen
+  oder dunklen Windows-Design
+- **Klick** öffnet die Statistik: aktuelle Raten, Datenmengen für
+  Sitzung / Heute / Woche / Monat, Live-Graph der letzten 60 Messungen
+- **Verlauf** als Balkendiagramm (30 Tage, 90 Tage, 12 Monate) mit Summen,
+  Tagesdurchschnitt und CSV-Export für Excel
+- **Doppelklick** öffnet die Einstellungen, **Rechtsklick** ein Menü mit allen
+  Funktionen
+- Einheit wählbar (automatisch, KB/s, MB/s, kbit/s, Mbit/s), Adapter wählbar
+  oder automatisch (virtuelle Adapter von Hyper-V, WSL, VirtualBox, VMware
+  werden ignoriert)
+- Optional **auf allen Monitoren** – jede Taskleiste bekommt ihre eigene Anzeige
+- Blendet sich bei **Vollbild-Apps** (Spiele, Videos) automatisch aus
+- Taskleiste oben oder unten – beides funktioniert
+- Installation **ohne Administratorrechte**, optional mit Autostart
+- **Keine Telemetrie**, keine Internetverbindung – alle Daten bleiben auf deinem PC
+
+| Statistik | Verlauf |
+|---|---|
+| ![Statistik](docs/images/statistik.png) | ![Verlauf](docs/images/verlauf.png) |
+
+## Download
+
+Unter **[Releases](../../releases)** gibt es zwei Varianten des Setups:
+
+| Datei | Für wen? |
+|---|---|
+| `SpeedyMonitor_Setup_1.0.0.exe` | Klein. Benötigt die [.NET 8 Desktop Runtime (x64)](https://dotnet.microsoft.com/download/dotnet/8.0) – das Setup prüft das und hilft beim Nachinstallieren. |
+| `SpeedyMonitor_Setup_1.0.0_Standalone.exe` | Größer, aber mit eingebauter Laufzeitumgebung – **funktioniert überall ohne Zusatzinstallation**. |
+
+Im Zweifel die **Standalone-Variante** nehmen.
+
+Das Setup ist nicht digital signiert, deshalb meldet sich beim ersten Start
+Windows SmartScreen („Der Computer wurde durch Windows geschützt“). Einfach
+auf **„Weitere Informationen“** → **„Trotzdem ausführen“** klicken.
+
+## Anleitung
+
+Die ausführliche Anleitung mit Screenshots – Installation, Bedienung,
+Einstellungen, Update, Deinstallation und häufige Fragen – findest du hier:
+
+**➜ [docs/ANLEITUNG.md](docs/ANLEITUNG.md)**
 
 ## Wie es dazu kam
 
@@ -10,88 +58,56 @@ war damit Schluss: Die Technik dahinter gibt es nicht mehr, und keine der
 Alternativen hat mich wirklich überzeugt. Also habe ich mir gedacht: Dann baue
 ich mir eben selbst eins – genau so, wie ich es haben will.
 
-## Was es ist
+## Hinweis
 
-Schlanker Nachbau des klassischen Windows-NetSpeedMonitor: eine Textanzeige
-("↑ ... / ↓ ...") direkt in der Taskleiste, neben Netzwerk/Lautstärke/Uhr.
+Speedy Monitor ist ein Hobbyprojekt. Windows 11 bietet keine offizielle
+Schnittstelle mehr für eigene Anzeigen in der Taskleiste; Speedy Monitor
+dockt sich deshalb als eigenes Fenster passgenau an die Taskleiste an. Das
+funktioniert zuverlässig, kann aber nach größeren Windows-Updates eine
+Anpassung erfordern. Probleme gern als [Issue](../../issues) melden.
+
+## Credits & Lizenz
+
+Entwickler: **breiti35** · Code-Mitarbeit: **Claude (Anthropic)**
+
+Lizenz: [MIT](LICENSE)
+
+---
+
+## Für Entwickler
+
+### Technischer Hintergrund
+
 Das Original lief als Taskbar-Deskband – eine Technik, die Windows 11
-komplett entfernt hat. Diese Version erreicht optisch fast dasselbe Ergebnis
-über ein eigenes, randloses Overlay-Fenster, das sich automatisch an die
-Taskleiste andockt (siehe Abschnitt "Technischer Hintergrund").
+komplett entfernt hat. Speedy Monitor verwendet stattdessen ein eigenes,
+nicht aktivierbares Layered Window (`WS_EX_TOOLWINDOW` + `WS_EX_NOACTIVATE`),
+das per UI Automation die Position des System-Tray-Clusters ermittelt
+(`TaskbarLayoutHelper.cs`) und sich direkt links daneben andockt
+(`TaskbarOverlayWindow.cs`).
 
-## Funktionen
+Da Windows 11 die Taskleiste mit erhöhter Shell-Priorität rendert und sie
+sich bei eigenen Ereignissen (Hover, Klicks, Icon-Updates) immer wieder über
+normale Topmost-Fenster legt, holt sich das Panel bei jeder
+Werteaktualisierung per `SetWindowPos` zurück nach vorne. Zusätzlich
+reagiert es über einen `SetWinEventHook` auf Vordergrundwechsel (Start-Menü,
+Suche, Schnelleinstellungen, Alt+Tab …) mit einer kurzen Salve an
+Reassert-Versuchen. Während ein Shell-Flyout offen ist, liegt kurz legitim
+die Taskleiste obenauf – wie beim alten Deskband auch. Vollbild-Apps und eine
+automatisch ausgeblendete Taskleiste werden erkannt; dann blendet sich das
+Panel aus. Die Taskleisten werden alle 5 s abgeglichen (Auflösungs- und
+Monitorwechsel, Explorer-Neustart).
 
-- Textanzeige direkt auf der Taskleiste (transparentes Layered Window, kein
-  Kasten): ▲/▼ farbcodiert (orange = Upload, grün = Download), Zahlen und
-  Einheiten in festen Spalten ausgerichtet – das Panel bewegt sich nie
-- Bleibt zuverlässig über der Taskleiste sichtbar, blendet sich aber bei
-  Vollbild-Apps (Spiele, Videos) und automatisch ausgeblendeter Taskleiste aus
-- Passt sich live an hellen/dunklen Windows-Modus an
-- **Klick** aufs Panel: Statistik-Popup wie beim Original – aktuelle Raten,
-  Sitzung/Heute/Woche/Monat, Live-Graph der letzten 60 Messungen, Adapter
-- **Verlauf…** (Link im Statistik-Popup): Balkendiagramm pro Tag (30/90 Tage)
-  oder pro Monat (12 Monate), Summen und Tagesdurchschnitt, CSV-Export für Excel;
-  Tageswerte werden gut ein Jahr aufbewahrt
-- Optional **auf allen Monitoren**: jede Taskleiste bekommt ihr eigenes Panel
-  (Per-Monitor-DPI, also auch bei unterschiedlicher Skalierung scharf)
-- **Doppelklick**: Einstellungen (Dark Mode, gruppiert, "Standard"-Button)
-- **Rechtsklick**: Menü mit Live-Werten, Einheit und Adapter direkt
-  umschaltbar, Autostart, Statistik zurücksetzen, Über, Beenden
-- Zählt IPv4 + IPv6; im Automatik-Modus werden virtuelle Switches
-  (Hyper-V, WSL, VirtualBox, VMware) ignoriert, damit VM-Traffic nicht doppelt zählt
-- Nur eine Instanz; Fehler landen in `%AppData%\SpeedyMonitor\error.log`,
-  Einstellungen/Statistik werden absturzsicher (atomar) gespeichert
+Kein offiziell unterstützter Mechanismus, aber der bestmögliche Ersatz ohne
+Systemeingriff (kein Taskleisten-Mod wie ExplorerPatcher nötig).
 
-Kein Tray-/Systray-Icon mehr – die komplette Bedienung läuft über das
-Taskleisten-Panel selbst.
+Weitere Details: zählt IPv4 + IPv6, nur eine Instanz (Mutex), Einstellungen
+und Statistik werden atomar gespeichert (`%AppData%\SpeedyMonitor\settings.json`
+bzw. `stats.json`, Tageswerte ca. 400 Tage), Fehler landen in
+`%AppData%\SpeedyMonitor\error.log`.
 
-## Starten
+### Bauen
 
-Fertig gebaute Version liegt unter `publish\SpeedyMonitor.exe` – einfach
-doppelklicken. Das Panel erscheint automatisch links neben den System-Tray-
-Icons.
-
-## Technischer Hintergrund
-
-Windows 11 hat die alte Deskband-Technik entfernt, mit der NetSpeedMonitor
-unter Windows 10 direkt in die Taskleistenfläche eingebettet war – es gibt
-keine offizielle API mehr, um dort eigene Inhalte zu zeichnen. Diese Version
-behilft sich mit einem eigenen, nicht aktivierbaren Fenster (`WS_EX_TOOLWINDOW`
-+ `WS_EX_NOACTIVATE`), das per UI Automation die Position des System-Tray-
-Clusters ermittelt (`TaskbarLayoutHelper.cs`) und sich direkt links daneben
-andockt (`TaskbarOverlayWindow.cs`). Da Windows 11 die Taskleiste selbst mit
-erhöhter Shell-Priorität rendert und sie sich bei eigenen Ereignissen
-(Hover, Klicks, Icon-Updates) immer wieder über normale Topmost-Fenster legt,
-holt sich das Panel bei jeder Werteaktualisierung aktiv per `SetWindowPos`
-zurück nach vorne. Zusätzlich reagiert es über einen `SetWinEventHook` auf
-jeden Vordergrundwechsel im System (Start-Menü, Suche, Schnelleinstellungen,
-Alt+Tab, ...) mit einer kurzen Salve an Reassert-Versuchen, damit es sofort
-zurückkehrt, sobald ein Flyout schließt, statt bis zum nächsten Timer-Tick
-verdeckt zu bleiben. Während ein Shell-Flyout selbst offen ist (z. B.
-Start-Menü), liegt kurz legitim die Taskleiste obenauf – das wäre beim
-alten Deskband nicht anders gewesen.
-
-Das ist kein offiziell unterstützter Mechanismus, sondern der bestmögliche
-Ersatz ohne Systemeingriff (kein Taskleisten-Mod wie ExplorerPatcher nötig).
-Funktioniert zuverlässig, kann aber bei künftigen größeren Windows-Updates
-angepasst werden müssen, falls sich die interne Taskleisten-Struktur ändert.
-
-## Installation
-
-`installer\Output\SpeedyMonitor_Setup_<Version>.exe` ausführen. Installiert pro
-Benutzer ohne Admin-Rechte nach `%LocalAppData%\Programs\Speedy Monitor`, mit
-Startmenü-Eintrag, optional Desktop-Icon und Autostart. Deinstallation über
-„Apps & Features“ (fragt, ob Einstellungen und Statistik gelöscht werden sollen).
-Voraussetzung: .NET 8 Desktop Runtime (x64) – das Setup prüft das und bietet
-sonst den Download an.
-
-Setup neu bauen (benötigt Inno Setup 6.7+):
-
-```
-powershell -ExecutionPolicy Bypass -File build-installer.ps1
-```
-
-## Entwickeln / neu bauen
+Benötigt das .NET 8 SDK.
 
 ```
 dotnet build                    # Debug-Build unter src\NetSpeedMonitor\bin\Debug\...
@@ -99,20 +115,30 @@ dotnet publish src\NetSpeedMonitor\NetSpeedMonitor.csproj -c Release -r win-x64 
   --self-contained false -p:PublishSingleFile=true -o publish
 ```
 
-Benötigt das .NET 8 SDK (bzw. zur Laufzeit die .NET 8 Desktop Runtime,
-die mit dem SDK mitkommt).
+Setup bauen (benötigt zusätzlich Inno Setup 6.7+; Ergebnis unter
+`installer\Output\`):
 
-## Projektstruktur
+```
+powershell -ExecutionPolicy Bypass -File build-installer.ps1
+```
+
+Das Setup installiert pro Benutzer ohne Admin-Rechte nach
+`%LocalAppData%\Programs\Speedy Monitor` (Startmenü-Eintrag, optional
+Desktop-Icon und Autostart über `HKCU\...\Run`). Die Deinstallation fragt, ob
+Einstellungen und Statistik gelöscht werden sollen.
+
+### Projektstruktur (`src/NetSpeedMonitor`)
 
 - `Program.cs` – Einstieg, Einzelinstanz-Mutex, globale Fehlerbehandlung
 - `TrayApplicationContext.cs` – verbindet Overlay, Monitor, Kontextmenü, Flyout und Dialoge
-- `NetworkMonitor.cs` – pollt `NetworkInterface`-Zähler und berechnet die Transferrate
+- `NetworkMonitor.cs` – pollt die `NetworkInterface`-Zähler und berechnet die Transferrate
 - `TaskbarOverlayWindow.cs`, `Overlay*.cs` – Layered-Window-Panel, Rendering, Topmost-/Vollbild-Logik
 - `TaskbarLayoutHelper.cs` – Taskleisten- und Tray-Cluster-Position, Auto-Hide-Erkennung
 - `StatsFlyout.cs` – Statistik-Popup mit Live-Graph
+- `HistoryWindow.cs`, `HistoryChart.cs` – Verlaufsfenster mit Balkendiagramm und CSV-Export
 - `MenuRenderer.cs` – Kontextmenü im Windows-11-Stil
 - `SettingsForm.cs`, `AboutDialog.cs`, `ConfirmDialog.cs` – Dialoge
 - `ThemeHelper.cs` – Hell/Dunkel-Paletten, dunkle Titelleisten, abgerundete Ecken
-- `StatsStore.cs` – Sitzungs-/Tages-/Wochen-/Monats-Traffic (`%AppData%\SpeedyMonitor\stats.json`)
-- `AppSettings.cs` – Einstellungen (`%AppData%\SpeedyMonitor\settings.json`)
-- `AppLog.cs`, `AppIconProvider.cs`, `AutostartHelper.cs`, `Formatting.cs`, `WindowActivation.cs` – Hilfsklassen
+- `StatsStore.cs` – Sitzungs-/Tages-/Wochen-/Monats-Traffic
+- `AppSettings.cs` – Einstellungen
+- `AppPaths.cs`, `AppLog.cs`, `AppIconProvider.cs`, `AutostartHelper.cs`, `Formatting.cs`, `WindowActivation.cs` – Hilfsklassen

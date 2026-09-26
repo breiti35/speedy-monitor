@@ -4,7 +4,14 @@
 #define AppName "Speedy Monitor"
 #define AppExe "SpeedyMonitor.exe"
 #define AppPublisher "breiti35"
-#define PublishDir "..\publish"
+; ISCC /DStandalone baut die Variante mit eingebauter .NET-Laufzeit (kein Runtime-Check noetig).
+#ifdef Standalone
+  #define PublishDir "..\publish-standalone"
+  #define OutputSuffix "_Standalone"
+#else
+  #define PublishDir "..\publish"
+  #define OutputSuffix ""
+#endif
 #define AppVersion GetVersionNumbersString(PublishDir + "\" + AppExe)
 ; Nur Major.Minor.Patch fuer Anzeige und Dateiname.
 #define AppVersionShort Copy(AppVersion, 1, RPos(".", AppVersion) - 1)
@@ -23,7 +30,8 @@ DefaultGroupName={#AppName}
 DisableProgramGroupPage=yes
 UsePreviousAppDir=yes
 OutputDir=Output
-OutputBaseFilename=SpeedyMonitor_Setup_{#AppVersionShort}
+OutputBaseFilename=SpeedyMonitor_Setup_{#AppVersionShort}{#OutputSuffix}
+LicenseFile=..\LICENSE
 SetupIconFile=..\src\NetSpeedMonitor\AppIcon.ico
 UninstallDisplayIcon={app}\{#AppExe}
 UninstallDisplayName={#AppName}
@@ -76,10 +84,14 @@ function InitializeSetup: Boolean;
 var
   ErrorCode: Integer;
 begin
+#ifdef Standalone
+  Result := True;
+#else
   Result := IsDesktopRuntime8Installed;
   if not Result then
     if SuppressibleMsgBox(CustomMessage('RuntimeMissing'), mbError, MB_YESNO, IDNO) = IDYES then
       ShellExec('open', 'https://dotnet.microsoft.com/download/dotnet/8.0', '', '', SW_SHOWNORMAL, ewNoWait, ErrorCode);
+#endif
 end;
 
 // Laufende Instanz beenden, sonst ist die exe gesperrt (die App hat kein Hauptfenster,
