@@ -45,21 +45,42 @@ public static class SettingsStore
                 var json = File.ReadAllText(FilePath);
                 var settings = JsonSerializer.Deserialize<AppSettings>(json);
                 if (settings is not null)
-                    return settings;
+                    return Validate(settings);
             }
         }
-        catch
+        catch (Exception ex)
         {
-            // Bei defekter/ungueltiger Settings-Datei einfach auf Standardwerte zurueckfallen.
+            // Bei defekter/ungueltiger Settings-Datei auf Standardwerte zurueckfallen.
+            AppLog.Error($"Einstellungen konnten nicht gelesen werden: {FilePath}", ex);
         }
 
         return new AppSettings();
     }
 
+    private static AppSettings Validate(AppSettings settings)
+    {
+        settings.UpdateIntervalMs = Math.Clamp(settings.UpdateIntervalMs, 250, 5000);
+        if (!Enum.IsDefined(settings.Unit))
+            settings.Unit = SpeedUnit.Auto;
+        if (string.IsNullOrWhiteSpace(settings.AdapterId))
+            settings.AdapterId = "Auto";
+        return settings;
+    }
+
+    /// <summary>Wirft nie - ein fehlgeschlagener Save wird nur protokolliert.</summary>
     public static void Save(AppSettings settings)
     {
-        Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
-        var json = JsonSerializer.Serialize(settings, new JsonSerializerOptions { WriteIndented = true });
-        File.WriteAllText(FilePath, json);
+        string json;
+        try
+        {
+            json = JsonSerializer.Serialize(settings, new JsonSerializerOptions { WriteIndented = true });
+        }
+        catch (Exception ex)
+        {
+            AppLog.Error("Einstellungen konnten nicht serialisiert werden", ex);
+            return;
+        }
+
+        AppLog.TryWriteAtomic(FilePath, json, $"Einstellungen konnten nicht gespeichert werden: {FilePath}");
     }
 }

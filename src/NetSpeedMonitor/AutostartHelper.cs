@@ -10,20 +10,36 @@ public static class AutostartHelper
 
     public static bool IsEnabled()
     {
-        using var key = Registry.CurrentUser.OpenSubKey(RunKeyPath, writable: false);
-        return key?.GetValue(ValueName) is string value
-               && value.Trim('"').Equals(GetExePath(), StringComparison.OrdinalIgnoreCase);
+        try
+        {
+            using var key = Registry.CurrentUser.OpenSubKey(RunKeyPath, writable: false);
+            return key?.GetValue(ValueName) is string value
+                   && value.Trim('"').Equals(GetExePath(), StringComparison.OrdinalIgnoreCase);
+        }
+        catch (Exception ex)
+        {
+            AppLog.Error("Autostart-Status konnte nicht gelesen werden", ex);
+            return false;
+        }
     }
 
+    /// <summary>Wirft nie - Fehler werden nur protokolliert.</summary>
     public static void SetEnabled(bool enabled)
     {
-        using var key = Registry.CurrentUser.OpenSubKey(RunKeyPath, writable: true)
-                         ?? Registry.CurrentUser.CreateSubKey(RunKeyPath);
+        try
+        {
+            using var key = Registry.CurrentUser.OpenSubKey(RunKeyPath, writable: true)
+                             ?? Registry.CurrentUser.CreateSubKey(RunKeyPath);
 
-        if (enabled)
-            key.SetValue(ValueName, $"\"{GetExePath()}\"");
-        else
-            key.DeleteValue(ValueName, throwOnMissingValue: false);
+            if (enabled)
+                key.SetValue(ValueName, $"\"{GetExePath()}\"");
+            else
+                key.DeleteValue(ValueName, throwOnMissingValue: false);
+        }
+        catch (Exception ex)
+        {
+            AppLog.Error($"Autostart konnte nicht {(enabled ? "aktiviert" : "deaktiviert")} werden", ex);
+        }
     }
 
     private static string GetExePath() => Environment.ProcessPath ?? Application.ExecutablePath;

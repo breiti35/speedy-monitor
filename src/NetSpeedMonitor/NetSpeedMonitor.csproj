@@ -9,6 +9,14 @@
          (Ermittlung der Tray-Cluster-Position) - die UI selbst bleibt WinForms. -->
     <UseWPF>true</UseWPF>
     <ImplicitUsings>enable</ImplicitUsings>
+    <ApplicationIcon>AppIcon.ico</ApplicationIcon>
+    <Product>NetSpeed Monitor</Product>
+    <AssemblyTitle>NetSpeed Monitor</AssemblyTitle>
+    <Version>1.1.0</Version>
   </PropertyGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="AppIcon.ico" LogicalName="NetSpeedMonitor.AppIcon.ico" />
+  </ItemGroup>
 
 </Project>

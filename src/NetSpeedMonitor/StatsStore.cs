@@ -1,4 +1,5 @@
 using System.IO;
+using System.Linq;
 using System.Text.Json;
 
 namespace NetSpeedMonitor;
@@ -113,28 +114,37 @@ public sealed class StatsStore
                 var json = File.ReadAllText(FilePath);
                 var data = JsonSerializer.Deserialize<StatsData>(json);
                 if (data is not null)
+                {
+                    // "null"-Eintraege in handeditierten/teilweise defekten Dateien wuerden spaeter NREs ausloesen.
+                    data.Today ??= new DayTotal { Date = DateTime.Now.Date };
+                    data.History = data.History?.Where(d => d is not null).ToList() ?? new();
                     return data;
+                }
             }
         }
-        catch
+        catch (Exception ex)
         {
-            // Bei defekter Statistikdatei einfach neu beginnen.
+            // Bei defekter Statistikdatei neu beginnen.
+            AppLog.Error($"Statistikdatei konnte nicht gelesen werden: {FilePath}", ex);
         }
 
         return new StatsData();
     }
 
+    /// <summary>Wirft nie - Statistik ist nicht kritisch.</summary>
     public void Save()
     {
+        string json;
         try
         {
-            Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
-            var json = JsonSerializer.Serialize(_data, new JsonSerializerOptions { WriteIndented = true });
-            File.WriteAllText(FilePath, json);
+            json = JsonSerializer.Serialize(_data, new JsonSerializerOptions { WriteIndented = true });
         }
-        catch
+        catch (Exception ex)
         {
-            // Statistik ist nicht kritisch - ein fehlgeschlagener Save darf die App nicht stoeren.
+            AppLog.Error("Statistik konnte nicht serialisiert werden", ex);
+            return;
         }
+
+        AppLog.TryWriteAtomic(FilePath, json, $"Statistik konnte nicht gespeichert werden: {FilePath}");
     }
 }

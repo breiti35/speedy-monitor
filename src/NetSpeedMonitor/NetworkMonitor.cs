@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Net.NetworkInformation;
 
 namespace NetSpeedMonitor;
@@ -16,7 +17,8 @@ public sealed class NetworkMonitor : IDisposable
 {
     private readonly System.Windows.Forms.Timer _timer;
     private readonly Dictionary<string, (long Sent, long Received)> _lastCounters = new();
-    private DateTime _lastSampleUtc;
+    // Monotone Zeitbasis: Uhrumstellungen/NTP-Korrekturen duerfen die Rate nicht verfaelschen.
+    private long _lastSampleTimestamp;
 
     public event Action<NetworkSample>? SampleReady;
 
@@ -39,8 +41,7 @@ public sealed class NetworkMonitor : IDisposable
 
     public void Start()
     {
-        PrimeCounters();
-        _lastSampleUtc = DateTime.UtcNow;
+        ResetBaseline();
         _timer.Start();
     }
 
@@ -52,18 +53,13 @@ public sealed class NetworkMonitor : IDisposable
     /// </summary>
     public void ResetBaseline()
     {
-        PrimeCounters();
-        _lastSampleUtc = DateTime.UtcNow;
-    }
-
-    private void PrimeCounters()
-    {
         _lastCounters.Clear();
         foreach (var ni in GetCandidateInterfaces())
         {
-            var stats = ni.GetIPv4Statistics();
-            _lastCounters[ni.Id] = (stats.BytesSent, stats.BytesReceived);
+            if (TryGetCounters(ni, out var counters))
+                _lastCounters[ni.Id] = counters;
         }
+        _lastSampleTimestamp = Stopwatch.GetTimestamp();
     }
 
     private IEnumerable<NetworkInterface> GetCandidateInterfaces()
@@ -76,10 +72,26 @@ public sealed class NetworkMonitor : IDisposable
         return AdapterId == "Auto" ? all : all.Where(ni => ni.Id == AdapterId);
     }
 
+    // IPv4 + IPv6. Ein Adapter kann zwischen Aufzaehlung und Abfrage verschwinden -> dann ueberspringen.
+    private static bool TryGetCounters(NetworkInterface ni, out (long Sent, long Received) counters)
+    {
+        try
+        {
+            var stats = ni.GetIPStatistics();
+            counters = (stats.BytesSent, stats.BytesReceived);
+            return true;
+        }
+        catch (NetworkInformationException)
+        {
+            counters = default;
+            return false;
+        }
+    }
+
     private void OnTick(object? sender, EventArgs e)
     {
-        var now = DateTime.UtcNow;
-        var elapsedSeconds = (now - _lastSampleUtc).TotalSeconds;
+        var now = Stopwatch.GetTimestamp();
+        var elapsedSeconds = Stopwatch.GetElapsedTime(_lastSampleTimestamp, now).TotalSeconds;
         if (elapsedSeconds <= 0)
             elapsedSeconds = IntervalMs / 1000.0;
 
@@ -90,28 +102,30 @@ public sealed class NetworkMonitor : IDisposable
 
         foreach (var ni in GetCandidateInterfaces())
         {
+            if (!TryGetCounters(ni, out var counters))
+                continue;
+
             seenIds.Add(ni.Id);
             names.Add(ni.Name);
-            var stats = ni.GetIPv4Statistics();
 
             if (_lastCounters.TryGetValue(ni.Id, out var last))
             {
-                var sentDelta = stats.BytesSent - last.Sent;
-                var receivedDelta = stats.BytesReceived - last.Received;
+                var sentDelta = counters.Sent - last.Sent;
+                var receivedDelta = counters.Received - last.Received;
 
                 // Negative Deltas (z.B. nach Adapter-Reset oder Zaehlerueberlauf) werden ignoriert.
                 if (sentDelta >= 0) uploadDelta += sentDelta;
                 if (receivedDelta >= 0) downloadDelta += receivedDelta;
             }
 
-            _lastCounters[ni.Id] = (stats.BytesSent, stats.BytesReceived);
+            _lastCounters[ni.Id] = counters;
         }
 
         // Adapter, die nicht mehr aktiv/vorhanden sind, aus dem Cache entfernen.
         foreach (var staleId in _lastCounters.Keys.Except(seenIds).ToList())
             _lastCounters.Remove(staleId);
 
-        _lastSampleUtc = now;
+        _lastSampleTimestamp = now;
         MonitoredAdapterNames = names;
 
         var sample = new NetworkSample(
