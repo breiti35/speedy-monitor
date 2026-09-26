@@ -11,7 +11,7 @@ Windows-11-Taskleiste an – so wie früher der NetSpeed Monitor unter Windows 1
 | `SpeedyMonitor_Setup_1.0.0_Standalone.exe` | ca. 47 MB | Funktioniert ohne weitere Voraussetzungen – im Zweifel diese nehmen. |
 
 Installation ohne Administratorrechte, nur für den aktuellen Benutzer. Die Anleitung mit Screenshots
-steht in [docs/ANLEITUNG.md](docs/ANLEITUNG.md).
+steht in [Anleitung](https://github.com/breiti35/speedy-monitor/blob/master/docs/ANLEITUNG.md).
 
 > **Hinweis zur Windows-Warnung:** Das Setup ist nicht digital signiert. Windows SmartScreen zeigt
 > deshalb „Der Computer wurde durch Windows geschützt“. Auf „Weitere Informationen“ und dann
