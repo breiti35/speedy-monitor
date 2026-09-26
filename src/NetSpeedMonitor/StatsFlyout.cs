@@ -48,7 +48,7 @@ public sealed class StatsFlyout : Form
         TopMost = true;
         StartPosition = FormStartPosition.Manual;
         KeyPreview = true;
-        Text = "Speedy Monitor – Statistik";
+        Text = L.StatsTitle;
         DoubleBuffered = true;
         SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
         BackColor = _p.Surface;
@@ -250,10 +250,10 @@ public sealed class StatsFlyout : Form
         var month = _stats.MonthTotal();
         var rows = new (string Label, long Up, long Down)[]
         {
-            ("Sitzung", session.Upload, session.Download),
-            ("Heute", today.UploadBytes, today.DownloadBytes),
-            ("Woche (7 Tage)", week.Upload, week.Download),
-            ("Monat", month.Upload, month.Download)
+            (L.RowSession, session.Upload, session.Download),
+            (L.RowToday, today.UploadBytes, today.DownloadBytes),
+            (L.RowWeek, week.Upload, week.Download),
+            (L.RowMonth, month.Upload, month.Download)
         };
         foreach (var row in rows)
         {
@@ -270,7 +270,7 @@ public sealed class StatsFlyout : Form
             g.DrawLine(linePen, 0, l.FooterLineY, ClientSize.Width, l.FooterLineY);
 
         // Fusszeile: "Adapter · seit ..." links (Adapter wird notfalls gekuerzt), Verlauf-Link rechts.
-        const string linkText = "Verlauf…";
+        var linkText = L.HistoryLink;
         var linkFont = _historyLinkHover ? _linkHoverFont : _smallFont;
         var linkSize = TextRenderer.MeasureText(g, linkText, linkFont, Size.Empty, TextFormatFlags.NoPadding);
         _historyLinkBounds = new Rectangle(l.Pad + contentWidth - linkSize.Width - S(4), l.FooterY - S(3), linkSize.Width + S(8), _smallFont.Height + S(6));
@@ -278,8 +278,8 @@ public sealed class StatsFlyout : Form
             new Rectangle(l.Pad, l.FooterY, contentWidth, _smallFont.Height), _p.Accent, right);
 
         var names = _monitor.MonitoredAdapterNames;
-        var adapterText = names.Count == 0 ? "Kein aktiver Adapter" : string.Join(", ", names);
-        var durationText = " · seit " + FormatDuration(DateTime.Now - _stats.SessionStart);
+        var adapterText = names.Count == 0 ? L.NoActiveAdapter : string.Join(", ", names);
+        var durationText = L.SessionSince(FormatDuration(DateTime.Now - _stats.SessionStart));
         var durationWidth = TextRenderer.MeasureText(g, durationText, _smallFont, Size.Empty, TextFormatFlags.NoPadding).Width;
         var leftWidth = contentWidth - linkSize.Width - S(12);
         var adapterWidth = Math.Min(

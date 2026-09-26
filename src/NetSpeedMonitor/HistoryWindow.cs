@@ -17,7 +17,7 @@ public sealed class HistoryWindow : Form
 
     private readonly StatsStore _stats;
     private readonly HistoryChart _chart = new() { Dock = DockStyle.Fill, Margin = new Padding(0, 0, 0, 12) };
-    private readonly Label _heading = new() { Text = "Datenverbrauch", AutoSize = true, Anchor = AnchorStyles.Left, Font = new Font("Segoe UI Semibold", 11f), Margin = Padding.Empty };
+    private readonly Label _heading = new() { Text = L.HistoryHeading, AutoSize = true, Anchor = AnchorStyles.Left, Font = new Font("Segoe UI Semibold", 11f), Margin = Padding.Empty };
     private readonly Button[] _rangeButtons;
     private readonly Label[] _summaryCaptions;
     private readonly Label _totalUp = SummaryValue();
@@ -48,6 +48,28 @@ public sealed class HistoryWindow : Form
         WindowActivation.ForceForeground(_instance);
     }
 
+    /// <summary>Nach einem Sprachwechsel: offenes Fenster an gleicher Stelle neu aufbauen.</summary>
+    public static void ReopenIfOpen()
+    {
+        if (_instance is not { IsDisposed: false } old)
+            return;
+        var bounds = old.WindowState == FormWindowState.Normal ? old.Bounds : old.RestoreBounds;
+        var range = old._range;
+        var stats = old._stats;
+        old.Close();
+
+        _instance = new HistoryWindow(stats) { StartPosition = FormStartPosition.Manual, Bounds = bounds };
+        _instance.SelectRange(range);
+        _instance.Show();
+    }
+
+    private void SelectRange(HistoryRange range)
+    {
+        _range = range;
+        StyleRangeButtons();
+        RefreshData();
+    }
+
     private HistoryWindow(StatsStore stats)
     {
         _stats = stats;
@@ -56,7 +78,7 @@ public sealed class HistoryWindow : Form
         AutoScaleDimensions = new SizeF(96f, 96f);
         AutoScaleMode = AutoScaleMode.Dpi;
         Font = new Font("Segoe UI", 9f);
-        Text = "Speedy Monitor – Verlauf";
+        Text = L.HistoryTitle;
         FormBorderStyle = FormBorderStyle.Sizable;
         ShowInTaskbar = true;
         StartPosition = FormStartPosition.CenterScreen;
@@ -79,9 +101,9 @@ public sealed class HistoryWindow : Form
         var rangePanel = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Anchor = AnchorStyles.Right, Margin = Padding.Empty };
         _rangeButtons = new[]
         {
-            RangeButton("30 Tage", HistoryRange.Days30),
-            RangeButton("90 Tage", HistoryRange.Days90),
-            RangeButton("12 Monate", HistoryRange.Months12)
+            RangeButton(L.Range30Days, HistoryRange.Days30),
+            RangeButton(L.Range90Days, HistoryRange.Days90),
+            RangeButton(L.Range12Months, HistoryRange.Months12)
         };
         _rangeButtons[0].Margin = Padding.Empty;
         rangePanel.Controls.AddRange(_rangeButtons);
@@ -93,7 +115,7 @@ public sealed class HistoryWindow : Form
         var summary = new TableLayoutPanel { AutoSize = true, Dock = DockStyle.Fill, ColumnCount = 4, RowCount = 2, Margin = new Padding(0, 0, 0, 14) };
         for (var i = 0; i < 4; i++)
             summary.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25));
-        _summaryCaptions = new[] { "Upload gesamt", "Download gesamt", "Ø Upload pro Tag", "Ø Download pro Tag" }
+        _summaryCaptions = new[] { L.TotalUpload, L.TotalDownload, L.AvgUploadPerDay, L.AvgDownloadPerDay }
             .Select(t => new Label { Text = t, AutoSize = true, Margin = new Padding(0, 0, 8, 2) })
             .ToArray();
         var values = new[] { _totalUp, _totalDown, _avgUp, _avgDown };
@@ -108,8 +130,8 @@ public sealed class HistoryWindow : Form
         buttons.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         buttons.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         buttons.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-        var exportButton = new Button { Text = "Als CSV exportieren…", AutoSize = true, MinimumSize = new Size(92, 30), Padding = new Padding(8, 0, 8, 0), Margin = Padding.Empty };
-        _closeButton = new Button { Text = "Schließen", AutoSize = true, MinimumSize = new Size(92, 30), Margin = Padding.Empty };
+        var exportButton = new Button { Text = L.ExportCsv, AutoSize = true, MinimumSize = new Size(92, 30), Padding = new Padding(8, 0, 8, 0), Margin = Padding.Empty };
+        _closeButton = new Button { Text = L.Close, AutoSize = true, MinimumSize = new Size(92, 30), Margin = Padding.Empty };
         exportButton.Click += (_, _) => ExportCsv();
         _closeButton.Click += (_, _) => Close();
         buttons.Controls.Add(exportButton, 0, 0);
@@ -136,12 +158,7 @@ public sealed class HistoryWindow : Form
     private Button RangeButton(string text, HistoryRange range)
     {
         var button = new Button { Text = text, AutoSize = true, MinimumSize = new Size(84, 28), Margin = new Padding(6, 0, 0, 0), Tag = range };
-        button.Click += (_, _) =>
-        {
-            _range = range;
-            StyleRangeButtons();
-            RefreshData();
-        };
+        button.Click += (_, _) => SelectRange(range);
         return button;
     }
 
@@ -245,11 +262,11 @@ public sealed class HistoryWindow : Form
     {
         using var dialog = new SaveFileDialog
         {
-            Title = "Verlauf als CSV exportieren",
-            Filter = "CSV-Datei (*.csv)|*.csv|Alle Dateien (*.*)|*.*",
+            Title = L.ExportDialogTitle,
+            Filter = L.ExportFilter,
             DefaultExt = "csv",
             AddExtension = true,
-            FileName = $"SpeedyMonitor_Verlauf_{DateTime.Now.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)}.csv",
+            FileName = $"{L.ExportFilePrefix}{DateTime.Now.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)}.csv",
             InitialDirectory = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments)
         };
         if (dialog.ShowDialog(this) != DialogResult.OK)
@@ -259,19 +276,19 @@ public sealed class HistoryWindow : Form
         {
             // BOM, damit Excel die Datei als UTF-8 erkennt (sonst kaputte Umlaute/Einheiten).
             File.WriteAllText(dialog.FileName, BuildCsv(_stats.GetDailyTotals()), new UTF8Encoding(encoderShouldEmitUTF8Identifier: true));
-            SetStatus($"Exportiert: {Path.GetFileName(dialog.FileName)}", isError: false);
+            SetStatus(L.Exported(Path.GetFileName(dialog.FileName)), isError: false);
         }
         catch (Exception ex)
         {
             AppLog.Error($"CSV-Export fehlgeschlagen: {dialog.FileName}", ex);
-            SetStatus("Export fehlgeschlagen – ist die Datei noch in einem anderen Programm geöffnet?", isError: true);
+            SetStatus(L.ExportFailed, isError: true);
         }
     }
 
     private static string BuildCsv(IReadOnlyList<DayTotal> days)
     {
         var sb = new StringBuilder();
-        sb.Append("Datum;Upload (Bytes);Download (Bytes);Upload;Download\r\n");
+        sb.Append(L.CsvHeader).Append("\r\n");
         foreach (var d in days)
         {
             sb.Append(d.Date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)).Append(';')

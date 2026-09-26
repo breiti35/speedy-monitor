@@ -15,7 +15,7 @@ public sealed class TrayApplicationContext : ApplicationContext
     private readonly StatsStore _stats;
     // Primaere Taskleiste zuerst; weitere nur bei "Auf allen Monitoren anzeigen".
     private List<TaskbarOverlayWindow> _overlays = new();
-    private readonly ContextMenuStrip _menu;
+    private ContextMenuStrip _menu;
     private readonly System.Windows.Forms.Timer _anchorRefreshTimer;
     private readonly Queue<(double Up, double Down)> _history = new();
     private AppSettings _settings;
@@ -37,18 +37,19 @@ public sealed class TrayApplicationContext : ApplicationContext
     private const int SaveEveryNTicks = 30;
     private const int AnchorRefreshMs = 5000;
 
-    private static readonly (SpeedUnit Unit, string Text)[] UnitChoices =
-    {
-        (SpeedUnit.Auto, "Automatisch"),
+    private static (SpeedUnit Unit, string Text)[] UnitChoices =>
+    [
+        (SpeedUnit.Auto, L.Automatic),
         (SpeedUnit.KBs, "KB/s"),
         (SpeedUnit.MBs, "MB/s"),
         (SpeedUnit.Kbits, "kbit/s"),
         (SpeedUnit.Mbits, "Mbit/s")
-    };
+    ];
 
     public TrayApplicationContext()
     {
         _settings = SettingsStore.Load();
+        L.Apply(_settings.Language);
         _stats = new StatsStore();
 
         _menu = BuildContextMenu();
@@ -149,30 +150,30 @@ public sealed class TrayApplicationContext : ApplicationContext
         _headerItem.SetValues(SpeedFormatter.FormatFull(0, _settings.Unit), SpeedFormatter.FormatFull(0, _settings.Unit));
         menu.Items.Add(_headerItem);
         menu.Items.Add(new ToolStripSeparator());
-        menu.Items.Add("Statistik anzeigen…", null, (_, _) => ShowFlyout(menu.SourceControl as TaskbarOverlayWindow));
+        menu.Items.Add(L.MenuShowStats, null, (_, _) => ShowFlyout(menu.SourceControl as TaskbarOverlayWindow));
 
-        _unitMenu = new ToolStripMenuItem("Einheit");
+        _unitMenu = new ToolStripMenuItem(L.MenuUnit);
         foreach (var (unit, text) in UnitChoices)
             _unitMenu.DropDownItems.Add(new RadioMenuItem(text, (_, _) => SetUnit(unit)) { Tag = unit });
         menu.Items.Add(_unitMenu);
 
-        _adapterMenu = new ToolStripMenuItem("Netzwerkadapter");
+        _adapterMenu = new ToolStripMenuItem(L.MenuAdapter);
         // Platzhalter, damit der Untermenue-Pfeil erscheint; echte Eintraege beim Oeffnen.
         _adapterMenu.DropDownItems.Add("…");
         menu.Items.Add(_adapterMenu);
 
-        _autostartItem = new ToolStripMenuItem("Mit Windows starten", null, (_, _) => ToggleAutostart());
+        _autostartItem = new ToolStripMenuItem(L.MenuAutostart, null, (_, _) => ToggleAutostart());
         menu.Items.Add(_autostartItem);
 
-        _allMonitorsItem = new ToolStripMenuItem("Auf allen Monitoren anzeigen", null, (_, _) => ToggleAllMonitors());
+        _allMonitorsItem = new ToolStripMenuItem(L.MenuAllMonitors, null, (_, _) => ToggleAllMonitors());
         menu.Items.Add(_allMonitorsItem);
 
         menu.Items.Add(new ToolStripSeparator());
-        menu.Items.Add("Einstellungen…", null, (_, _) => OpenSettings());
-        menu.Items.Add("Statistik zurücksetzen…", null, (_, _) => ConfirmResetStats());
-        menu.Items.Add("Über Speedy Monitor", null, (_, _) => ShowAbout());
+        menu.Items.Add(L.MenuSettings, null, (_, _) => OpenSettings());
+        menu.Items.Add(L.MenuResetStats, null, (_, _) => ConfirmResetStats());
+        menu.Items.Add(L.MenuAbout, null, (_, _) => ShowAbout());
         menu.Items.Add(new ToolStripSeparator());
-        menu.Items.Add("Beenden", null, (_, _) => ExitApplication());
+        menu.Items.Add(L.MenuExit, null, (_, _) => ExitApplication());
 
         menu.Opening += (_, _) => RefreshMenuState();
         return menu;
@@ -199,7 +200,7 @@ public sealed class TrayApplicationContext : ApplicationContext
     {
         var items = _adapterMenu.DropDownItems;
         items.Clear();
-        items.Add(new RadioMenuItem("Automatisch (alle aktiven)", (_, _) => SetAdapter("Auto"))
+        items.Add(new RadioMenuItem(L.AdapterAutoShort, (_, _) => SetAdapter("Auto"))
         {
             Checked = _settings.AdapterId == "Auto"
         });
@@ -227,7 +228,7 @@ public sealed class TrayApplicationContext : ApplicationContext
         {
             var active = ni.OperationalStatus == OperationalStatus.Up;
             var id = ni.Id;
-            items.Add(new RadioMenuItem(active ? ni.Name : $"{ni.Name} (inaktiv)", (_, _) => SetAdapter(id))
+            items.Add(new RadioMenuItem(active ? ni.Name : $"{ni.Name} ({L.Inactive})", (_, _) => SetAdapter(id))
             {
                 Checked = _settings.AdapterId == id,
                 Enabled = active,
@@ -311,7 +312,7 @@ public sealed class TrayApplicationContext : ApplicationContext
         var down = SpeedFormatter.FormatFull(_lastSample.DownloadBytesPerSecond, _settings.Unit);
         var today = _stats.Today;
         return $"↑ {up}   ↓ {down}\n"
-               + $"Heute: ↑ {ByteFormatter.FormatBytes(today.UploadBytes)}   ↓ {ByteFormatter.FormatBytes(today.DownloadBytes)}";
+               + $"{L.TooltipToday} ↑ {ByteFormatter.FormatBytes(today.UploadBytes)}   ↓ {ByteFormatter.FormatBytes(today.DownloadBytes)}";
     }
 
     private void ToggleFlyout(TaskbarOverlayWindow source)
@@ -365,6 +366,7 @@ public sealed class TrayApplicationContext : ApplicationContext
     private void ApplySettings(AppSettings result)
     {
         var adapterChanged = result.AdapterId != _settings.AdapterId;
+        var languageChanged = result.Language != _settings.Language;
 
         _settings = result;
         SettingsStore.Save(_settings);
@@ -378,17 +380,39 @@ public sealed class TrayApplicationContext : ApplicationContext
         }
 
         AutostartHelper.SetEnabled(_settings.AutostartEnabled);
+        if (languageChanged)
+            ApplyLanguage();
         ReconcileOverlays();
         PushValues();
+    }
+
+    /// <summary>
+    /// Sprachwechsel zur Laufzeit: Menue neu aufbauen, offene Fenster mit Texten schliessen
+    /// bzw. neu oeffnen. Das Flyout zeichnet beim naechsten Oeffnen ohnehin neu.
+    /// </summary>
+    private void ApplyLanguage()
+    {
+        L.Apply(_settings.Language);
+
+        var oldMenu = _menu;
+        _menu = BuildContextMenu();
+        MenuRenderer.Apply(_menu, ThemeHelper.GetAppPalette());
+        foreach (var overlay in _overlays)
+            overlay.ContextMenuStrip = _menu;
+        oldMenu.Dispose();
+
+        _flyout?.Dismiss();
+        _aboutDialog?.Close();
+        HistoryWindow.ReopenIfOpen();
     }
 
     private void ConfirmResetStats()
     {
         var confirmed = ConfirmDialog.Ask(
             "Speedy Monitor",
-            "Statistik zurücksetzen?",
-            "Alle gespeicherten Datenmengen (Sitzung, Tage, Woche und Monat) werden unwiderruflich gelöscht.",
-            "Zurücksetzen");
+            L.ResetHeading,
+            L.ResetMessage,
+            L.ResetConfirm);
         if (confirmed)
             _stats.Reset();
     }
