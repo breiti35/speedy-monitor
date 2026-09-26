@@ -226,6 +226,13 @@ Faustregel: 1 Byte = 8 Bit. Ein Download mit 10 MB/s sind also etwa
 Wie oft die Anzeige erneuert wird, in Millisekunden (1000 ms = 1 Sekunde).
 Einstellbar von 250 bis 5000 ms, Standard ist 1000 ms.
 
+#### Sprache / Language
+
+In welcher Sprache Speedy Monitor seine Menüs und Fenster anzeigt:
+**Automatisch (Windows-Sprache)** richtet sich nach deinem Windows – bei
+deutschem Windows Deutsch, sonst Englisch. Alternativ fest **Deutsch** oder
+**English**. Die Umstellung wirkt sofort nach **OK**.
+
 #### Auf allen Monitoren anzeigen
 
 Siehe [Mehrere Monitore](#mehrere-monitore).

@@ -67,7 +67,7 @@ public static class L
     public static string RowMonth => T("Monat", "Month");
     public static string HistoryLink => T("Verlauf…", "History…");
     public static string NoActiveAdapter => T("Kein aktiver Adapter", "No active adapter");
-    public static string SessionSince(string duration) => T($" · seit {duration}", $" · for {duration}");
+    public static string SessionSince(string duration) => T($" · seit {duration}", $" · up {duration}");
 
     // Verlauf
     public static string HistoryTitle => T("Speedy Monitor – Verlauf", "Speedy Monitor – History");
